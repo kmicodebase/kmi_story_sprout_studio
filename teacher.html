@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StorySprout Studio — Teacher</title>
+  <!-- Self-hosted; see vendor/README.md. (This page is the teacher's, not a child's,
+       but there is no reason to leak an IP to Google for a font here either.) -->
+  <link href="vendor/fonts.css" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <!-- Shared byte-for-byte with workshop-plugin.html. If the crypto in the two pages
+     ever drifts, this page silently cannot decrypt student work. Bump ?v= together. -->
+  <script src="sprout-sync.js?v=1"></script>
+  <style>
+    :root {
+      --purple: #7c5cff;
+      --purple-dark: #5b3fd6;
+      --purple-light: #b9a6ff;
+      --purple-bg: #f2eeff;
+      --cream: #faf8f5;
+      --cream2: #f3efe9;
+      --cream3: #e9e3da;
+      --white: #fff;
+      --ink: #2c2836;
+      --ink2: #5a5470;
+      --ink3: #918aa6;
+      --border: #e6e1f0;
+      --border2: #cfc7e0;
+      --green: #38b48a;
+      --amber: #e0a03c;
+      --red: #e05c5c;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --font: 'Nunito', system-ui, sans-serif;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--cream);
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    header {
+      background: var(--white);
+      border-bottom: 2px solid var(--border);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    header h1 {
+      font-size: 17px;
+      margin: 0;
+      font-weight: 800;
+      color: var(--purple-dark);
+    }
+
+    header .tag {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      background: var(--purple-bg);
+      color: var(--purple-dark);
+      padding: 3px 8px;
+      border-radius: 20px;
+    }
+
+    .spacer {
+      flex: 1;
+    }
+
+    main {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 26px 24px 60px;
+    }
+
+    button {
+      font-family: var(--font);
+      font-weight: 700;
+      font-size: 13px;
+      border: none;
+      border-radius: var(--radius-sm);
+      padding: 10px 18px;
+      cursor: pointer;
+      background: var(--purple);
+      color: #fff;
+    }
+
+    button:hover:not(:disabled) {
+      background: var(--purple-dark);
+    }
+
+    button:disabled {
+      opacity: .5;
+      cursor: default;
+    }
+
+    button.ghost {
+      background: var(--white);
+      color: var(--ink2);
+      border: 2px solid var(--border);
+    }
+
+    button.ghost:hover:not(:disabled) {
+      background: var(--cream2);
+    }
+
+    .panel {
+      background: var(--white);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px 24px;
+      margin-bottom: 18px;
+    }
+
+    .panel h2 {
+      font-size: 15px;
+      margin: 0 0 4px;
+    }
+
+    .panel p {
+      color: var(--ink3);
+      font-size: 12.5px;
+      margin: 0 0 16px;
+    }
+
+    .how {
+      background: var(--cream);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      margin-bottom: 20px;
+    }
+
+    .how-step {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      margin-bottom: 14px;
+      font-size: 13px;
+      line-height: 1.65;
+      color: var(--ink2);
+    }
+
+    .how-step:last-of-type {
+      margin-bottom: 0;
+    }
+
+    .how-step b {
+      color: var(--ink);
+      display: block;
+    }
+
+    .how-step i {
+      font-style: normal;
+      font-weight: 700;
+      color: var(--purple-dark);
+    }
+
+    .how-num {
+      flex-shrink: 0;
+      width: 22px;
+      height: 22px;
+      margin-top: 1px;
+      border-radius: 50%;
+      background: var(--purple-light);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+    }
+
+    /* Collapsed by default: a teacher setting up a class does not need the privacy
+       model, but the one who asks deserves a straight answer rather than a shrug. */
+    .more {
+      margin-top: 16px;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+    }
+
+    .more summary {
+      cursor: pointer;
+      font-size: 12.5px;
+      font-weight: 700;
+      color: var(--purple-dark);
+      list-style: none;
+    }
+
+    .more summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .more summary::before {
+      content: '▸ ';
+      display: inline-block;
+      transition: transform .15s;
+    }
+
+    .more[open] summary::before {
+      content: '▾ ';
+    }
+
+    .more p {
+      font-size: 12.5px;
+      line-height: 1.7;
+      color: var(--ink2);
+      margin: 12px 0 0;
+    }
+
+    .more code {
+      background: var(--cream3);
+      padding: 1px 5px;
+      border-radius: 4px;
+      font-size: 12px;
+    }
+
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 0;
+      min-height: 58px;
+      border-top: 1px solid var(--border);
+    }
+
+    .step:first-of-type {
+      border-top: none;
+    }
+
+    .step .num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      background: var(--cream3);
+      color: var(--ink2);
+      font-size: 11px;
+      font-weight: 800;
+      display: grid;
+      place-items: center;
+    }
+
+    .step.done .num {
+      background: var(--green);
+      color: #fff;
+    }
+
+    /* The label takes the slack, so whatever action sits at the end of the row
+       lands hard right and the two steps line up with each other. */
+    .step .label {
+      font-size: 13px;
+      font-weight: 600;
+      flex: 1;
+    }
+
+    .step.done .label {
+      color: var(--ink3);
+    }
+
+    /* Google renders its button as a fixed-size iframe we can't restyle, so the
+       job here is just to sit it on the same baseline as our own controls
+       instead of letting it collide with them. */
+    #g-btn {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      min-height: 40px;
+    }
+
+    #g-btn:empty {
+      display: none;
+    }
+
+    .pass-link {
+      background: none;
+      border: none;
+      padding: 0;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--ink3);
+      text-decoration: underline;
+      text-underline-offset: 3px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .pass-link:hover {
+      background: none;
+      color: var(--purple-dark);
+    }
+
+    .or {
+      font-size: 11px;
+      color: var(--ink3);
+      font-weight: 600;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+      gap: 18px;
+    }
+
+    /* Click a preview to see it properly. The card is a glance; this is a look. */
+    #lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 9500;
+      background: rgba(24, 20, 40, .8);
+      backdrop-filter: blur(4px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 40px;
+      cursor: zoom-out;
+    }
+
+    #lightbox.open {
+      display: flex;
+    }
+
+    #lightbox img {
+      max-width: 100%;
+      max-height: 100%;
+      border-radius: var(--radius);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+      background: var(--white);
+    }
+
+    #lightbox .lb-cap {
+      position: absolute;
+      bottom: 22px;
+      color: #fff;
+      font-size: 13px;
+      font-weight: 700;
+      text-shadow: 0 1px 4px rgba(0, 0, 0, .6);
+    }
+
+    /* An explicit column, so the preview is structurally incapable of sitting on
+       top of the text no matter what the story thumbnail turns out to be. */
+    .team {
+      background: var(--white);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .team-thumb {
+      flex: 0 0 auto;
+      aspect-ratio: 4 / 3;
+      width: 100%;
+      background: var(--cream2);
+      display: grid;
+      place-items: center;
+      color: var(--ink3);
+      font-size: 12px;
+      border-bottom: 2px solid var(--border);
+      overflow: hidden;
+    }
+
+    /* width/height 100% so it SCALES to the box (auto would leave it at its small
+       natural size), with `contain` rather than `cover` so the whole page is visible —
+       cropping the top and bottom off a child's story defeats the point of showing it. */
+    .team-thumb img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      cursor: zoom-in;
+    }
+
+    .team-body {
+      flex: 1 1 auto;
+      padding: 14px 16px 16px;
+      position: relative;
+      background: var(--white);
+    }
+
+    .team-name {
+      font-size: 15px;
+      font-weight: 800;
+      margin-bottom: 2px;
+    }
+
+    .team-title {
+      font-size: 12.5px;
+      color: var(--ink2);
+      margin-bottom: 10px;
+    }
+
+    .team-meta {
+      font-size: 11px;
+      color: var(--ink3);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--ink3);
+      flex-shrink: 0;
+    }
+
+    .dot.fresh {
+      background: var(--green);
+    }
+
+    .dot.stale {
+      background: var(--amber);
+    }
+
+    .dot.err {
+      background: var(--red);
+    }
+
+    .code {
+      margin-top: 12px;
+      padding: 9px 11px;
+      background: var(--cream);
+      border: 1.5px dashed var(--border2);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-align: center;
+      cursor: pointer;
+      color: var(--purple-dark);
+    }
+
+    .code:hover {
+      background: var(--purple-bg);
+    }
+
+    .code.hidden {
+      color: var(--ink3);
+      font-weight: 600;
+      letter-spacing: 0;
+    }
+
+    .new-team {
+      margin-top: 18px;
+      padding: 22px;
+      border-radius: var(--radius);
+      background: var(--purple-bg);
+      border: 2px solid var(--purple-light);
+      text-align: center;
+    }
+
+    .new-team .nt-label {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--purple-dark);
+      margin-bottom: 6px;
+    }
+
+    .new-team .nt-name {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+
+    .new-team .nt-code {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--purple-dark);
+      letter-spacing: .07em;
+      margin-top: 6px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .new-team .nt-hint {
+      font-size: 12px;
+      color: var(--ink2);
+      margin-top: 12px;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .note {
+      font-size: 12px;
+      padding: 11px 14px;
+      border-radius: var(--radius-sm);
+      background: #fff8e8;
+      border: 1.5px solid #f0dca8;
+      color: #8a6a1e;
+      margin-top: 14px;
+    }
+
+    .err {
+      font-size: 12.5px;
+      padding: 11px 14px;
+      border-radius: var(--radius-sm);
+      background: #fdeaea;
+      border: 1.5px solid #f2c4c4;
+      color: #b23c3c;
+      margin-top: 14px;
+      display: none;
+      font-weight: 600;
+    }
+
+    .err.show {
+      display: block;
+    }
+
+    .hide {
+      display: none !important;
+    }
+
+    .live {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink3);
+      white-space: nowrap;
+    }
+
+    .live .dot {
+      animation: livePulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes livePulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: .25; }
+    }
+
+    .collect-status {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ink3);
+      text-align: right;
+      max-width: 380px;
+    }
+
+    .collect-status.ok {
+      color: var(--green);
+    }
+
+    .collect-status.err {
+      color: var(--red);
+    }
+
+    .team-actions {
+      margin-top: 10px;
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .del-link {
+      background: none;
+      border: none;
+      padding: 4px 2px;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--ink3);
+      cursor: pointer;
+    }
+
+    .del-link:hover {
+      background: none;
+      color: var(--red);
+    }
+
+    /* Deleting a team destroys the only copy of its secret code, and with it any
+       hope of ever reading that team's encrypted work again. It gets a real
+       dialog, not a browser confirm() nobody reads. */
+    #confirm-back {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(24, 20, 40, .55);
+      backdrop-filter: blur(3px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #confirm-back.open {
+      display: flex;
+    }
+
+    .confirm-card {
+      background: var(--white);
+      border-radius: var(--radius);
+      padding: 28px 30px;
+      width: 460px;
+      max-width: 92vw;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, .28);
+    }
+
+    .confirm-card h3 {
+      margin: 0 0 10px;
+      font-size: 17px;
+      color: var(--red);
+    }
+
+    .confirm-card p {
+      font-size: 13px;
+      color: var(--ink2);
+      margin: 0 0 12px;
+      line-height: 1.6;
+    }
+
+    .confirm-card ul {
+      font-size: 12.5px;
+      color: var(--ink2);
+      margin: 0 0 14px;
+      padding-left: 20px;
+      line-height: 1.8;
+    }
+
+    .confirm-card input {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: var(--font);
+      font-size: 14px;
+      padding: 10px 12px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--cream);
+    }
+
+    .confirm-card input:focus {
+      outline: none;
+      border-color: var(--red);
+      background: var(--white);
+    }
+
+    .confirm-row {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 18px;
+    }
+
+    .btn-danger {
+      background: var(--red);
+    }
+
+    .btn-danger:hover:not(:disabled) {
+      background: #c94a4a;
+    }
+
+    select,
+    input[type=number] {
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 8px 10px;
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--white);
+    }
+
+    /* Content level — class-wide, teacher-only. */
+    .level-bar {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      padding: 13px 15px;
+      background: var(--purple-bg);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+    }
+    .level-bar label {
+      display: block;
+      font-weight: 800;
+      font-size: 13.5px;
+      color: var(--ink);
+    }
+    .level-bar .level-blurb {
+      margin: 3px 0 0;
+      font-size: 12px;
+      color: var(--ink2);
+      max-width: 52ch;
+    }
+    .level-bar select:disabled { opacity: .55; }
+    .level-status {
+      font-size: 12px;
+      color: var(--ink3);
+      min-width: 8ch;
+    }
+    .level-status.ok  { color: var(--green); font-weight: 700; }
+    .level-status.err { color: var(--red);   font-weight: 700; }
+
+    #log {
+      font-size: 11.5px;
+      color: var(--ink3);
+      margin-top: 12px;
+      white-space: pre-wrap;
+      max-height: 120px;
+      overflow-y: auto;
+      font-family: ui-monospace, monospace;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <!-- Same mark and wording as the student page, so a teacher opening this
+         recognises it instantly as the same app the children are using. -->
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+      <path d="M12 3C8 3 5 6 5 10c0 2.5 1.2 4.7 3 6.1V18h8v-1.9c1.8-1.4 3-3.6 3-6.1 0-4-3-7-7-7z" fill="#9779D2" opacity=".25"/>
+      <path d="M9 18h6v2a1 1 0 01-1 1h-4a1 1 0 01-1-1v-2z" fill="#9779D2"/>
+      <path d="M12 7v6M9.5 9.5l2.5 2M14.5 9.5L12 12" stroke="#7C5CBF" stroke-width="1.5" stroke-linecap="round"/>
+    </svg>
+    <h1>StorySprout Studio</h1>
+    <span class="tag">Teacher</span>
+    <div class="spacer"></div>
+    <span class="collect-status" id="collect-status"></span>
+    <span id="who" style="font-size:12px;color:var(--ink3)"></span>
+    <button class="ghost hide" id="switch-signin" style="font-size:11px;padding:6px 10px">Switch</button>
+    <button class="ghost" id="sync-now" disabled>Collect work now</button>
+  </header>
+
+  <main>
+
+    <!-- Setup -->
+    <div class="panel" id="setup">
+      <h2>Set up your class</h2>
+      <p>Your students' stories come back to <strong>this computer</strong>, automatically.
+        No accounts, no logins, nothing for children to remember.</p>
+
+      <div class="how">
+        <div class="how-step">
+          <span class="how-num">1</span>
+          <div>
+            <b>Make a team for each computer.</b>
+            You'll get a team name and a secret code — something like <i>brave-otter</i> and
+            <i>481533</i>. Write it down, or tape it to that machine. You only do this once.
+          </div>
+        </div>
+        <div class="how-step">
+          <span class="how-num">2</span>
+          <div>
+            <b>Children type it in when they sit down.</b>
+            That's all they ever enter — no name, no email, no password to forget. If a group moves to a
+            different computer, they type the same two things and their story is waiting for them.
+          </div>
+        </div>
+        <div class="how-step">
+          <span class="how-num">3</span>
+          <div>
+            <b>Their work arrives here on its own.</b>
+            A few seconds after a child stops drawing, their story is sent back and saved into the folder
+            you pick below — with a dated history, so you can see how a story grew, not just where it ended up.
+          </div>
+        </div>
+
+        <details class="more">
+          <summary>Is it private? What if I lose the folder?</summary>
+          <p><b>Yes, it's private.</b> Each team's work is scrambled on the child's own computer
+            <i>before</i> it is sent, using their secret code as the key. Nothing in between can read a
+            word of it — not us, not the company whose computers carry it. Your computer is the only place
+            it exists in readable form.</p>
+          <p><b>The codes are the only key.</b> They live in a file called <code>teacher.json</code> in your
+            class folder. Keep a backup somewhere safe. If that file is lost, the stories cannot be
+            recovered — not by you, and not by us. That is the flip side of nobody else being able to read
+            them.</p>
+          <p><b>Children are anonymous.</b> A team identifies a <i>computer</i>, not a person. No child ever
+            creates an account, and no name or email of theirs is ever stored anywhere.</p>
+        </details>
+      </div>
+
+      <div class="step" id="step-signin">
+        <span class="num">1</span>
+        <span class="label">Sign in as the teacher</span>
+        <div id="g-btn"></div>
+      </div>
+
+      <div class="step" id="step-folder">
+        <span class="num">2</span>
+        <span class="label">Choose the folder to keep your class's work in</span>
+        <button class="ghost" id="pick-folder" disabled>Choose folder…</button>
+      </div>
+
+      <div class="note" id="folder-note">
+        When Chrome asks about the folder, choose <strong>“Allow on every visit”</strong> — otherwise
+        it will ask you again every single time you open this page.
+      </div>
+      <div class="err" id="setup-err"></div>
+    </div>
+
+    <!-- Class -->
+    <div class="panel hide" id="class-panel">
+      <div class="row">
+        <div>
+          <h2 style="margin-bottom:2px">Your teams</h2>
+          <p style="margin:0">One team = one computer. Tape its code to that machine.</p>
+        </div>
+        <div class="spacer"></div>
+        <!-- No interval picker. It used to exist because collecting was expensive, so
+             a teacher had to trade freshness against cost. That trade is gone:
+             checks are a few bytes, they pause when the tab is hidden, and they fire
+             on return. Asking a teacher to pick a number is just making them think
+             about plumbing. -->
+        <span class="live" id="live-dot" title="This board updates by itself">
+          <span class="dot fresh"></span> Updating automatically
+        </span>
+        <button id="new-team">+ New team</button>
+      </div>
+
+      <!-- Content level. Applies to the WHOLE class, every team at once, and
+           only a signed-in teacher can change it: the Worker reads the level
+           from the team's own record, so nothing a child does in the Studio
+           can loosen it. -->
+      <div class="level-bar">
+        <div>
+          <label for="content-tier">Picture content level</label>
+          <p class="level-blurb" id="level-blurb">—</p>
+        </div>
+        <div class="spacer"></div>
+        <select id="content-tier" disabled></select>
+        <span class="level-status" id="level-status"></span>
+      </div>
+
+      <div class="new-team hide" id="new-team-card">
+        <div class="nt-label">New team — write this down</div>
+        <div class="nt-name" id="nt-name">—</div>
+        <div class="nt-code" id="nt-code">—</div>
+        <div class="nt-hint">
+          On that computer, open the Studio with <code>?class=1</code> and enter these.<br>
+          The children only ever type this once.
+        </div>
+      </div>
+
+      <div class="err" id="class-err"></div>
+      <div id="log"></div>
+    </div>
+
+    <div class="grid" id="teams"></div>
+
+  </main>
+
+  <div id="lightbox">
+    <img id="lb-img" alt="">
+    <div class="lb-cap" id="lb-cap"></div>
+  </div>
+
+  <!-- Delete confirmation. Typing the team name is deliberate friction: this is
+       irreversible, and the encrypted work becomes unreadable forever. -->
+  <div id="confirm-back">
+    <div class="confirm-card">
+      <h3>Delete this team?</h3>
+      <p>You are about to permanently delete <strong id="del-name">—</strong>. This cannot be undone.</p>
+      <ul>
+        <li>Its secret code will be gone — and that code is the <strong>only key</strong> that can decrypt this team's work.</li>
+        <li>Everything it has synced will be erased from the relay.</li>
+        <li>The stories already collected onto this computer will be deleted too.</li>
+      </ul>
+      <p style="margin-bottom:8px">Type <strong id="del-confirm-name">—</strong> to confirm:</p>
+      <input id="del-input" type="text" autocomplete="off" spellcheck="false" placeholder="team name">
+      <div class="err" id="del-err"></div>
+      <div class="confirm-row">
+        <button class="ghost" id="del-cancel">Cancel</button>
+        <button class="btn-danger" id="del-go" disabled>Delete forever</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ═══════════════════════════════════════════════════════════════════════════
+       StorySprout Studio — Teacher dashboard
+    
+       The teacher's disk is the system of record. The relay is a dead-drop that
+       holds encrypted bytes for a few minutes; this page is where the work actually
+       lands, in the clear, and stays.
+    
+       Chrome/Edge only: it needs showDirectoryPicker(), which Firefox and Safari do
+       not implement at all.
+       ═══════════════════════════════════════════════════════════════════════════ */
+
+    const WORKER = 'https://storysprout-pip.jackwangxyw.workers.dev';
+
+    // The version of sprout-sync.js this page is built against. If a stale cached
+    // copy loads instead, the key-derivation recipe could differ from the one the
+    // students used — and the failure would be SILENT: uploads succeed, collection
+    // succeeds, and the stories simply never open. Better to refuse to start.
+    // Bump this, ?v= in the script tag, and SproutSync.VERSION together.
+    const REQUIRE_SYNC_VERSION = 1;
+
+    // ⚠ Paste your Google OAuth Web client ID here (Google Cloud Console →
+    //   Credentials → OAuth client ID → Web application). Authorized JavaScript
+    //   origins must include https://lzhangsktlab.github.io and http://localhost:8000.
+    //   Safe to commit — a client ID is public by design. Leave '' to use the
+    //   passphrase only.
+    const GOOGLE_CLIENT_ID = '642314399737-2mitejmjcc1jdtfn7mspjuhge9mu8ub5.apps.googleusercontent.com';
+
+    // The passphrase fallback is TYPED BY THE TEACHER and kept in this browser.
+    // It is deliberately NOT a constant in this file: anything hardcoded here is
+    // published to the world by GitHub Pages, and whoever reads it could create
+    // teams on the relay. It must match TEACHER_PASSPHRASE in the Worker.
+    const LS_PASS = 'sprout_teacher_pass';
+
+    const T = {
+      idToken: null,     // Google ID token (primary)
+      pass: null,        // teacher passphrase (fallback)
+      email: null,
+      root: null,        // FileSystemDirectoryHandle for the class folder
+      teacher: null,     // teacher.json
+      klass: null,       // class.json
+      timer: null,
+    };
+
+    const $ = (id) => document.getElementById(id);
+    const log = (m) => { $('log').textContent = (new Date().toLocaleTimeString() + '  ' + m + '\n' + $('log').textContent).slice(0, 4000); };
+    const showErr = (el, m) => { const e = $(el); e.textContent = m; e.classList.add('show'); };
+    const hideErr = (el) => $(el).classList.remove('show');
+
+    /* ── team name + code generation ─────────────────────────────────────────────
+       The code is GENERATED, never chosen. It is the only thing protecting a team's
+       work: a kid-picked "cat123" is guessable, and guessing a code lets someone
+       overwrite that team's story. Six digits is what a 7-year-old can type off a
+       sticker without a mistake — and digits have no upper/lower case to get wrong.
+       (The old word codes did: they derived keys case-sensitively while the entry
+       box only LOOKED uppercase via CSS text-transform. A silent trap.)
+
+       ENTROPY, measured rather than guessed: 10^6 codes = 19.9 BITS.
+       (History of this number: the previous format — three words + four digits —
+       was 28.0 bits, and an even earlier comment claimed ~35, which was simply
+       wrong. Quote none of these for the current format.)
+
+       19.9 bits is fine against a curious classmate and is NOT fine against a
+       determined attacker who holds the ciphertext — and note the sync rate limit
+       is per TEAM, not per IP, so it does not slow online code guessing either.
+       That trade was made deliberately, for typability, and is stated in
+       PAPER_REFERENCE.md rather than papered over. If it ever needs to be
+       stronger, add digits here — nothing else has to change: key derivation
+       takes the code as an opaque string, so teams created under the old word
+       format keep working unchanged.
+       ─────────────────────────────────────────────────────────────────────────── */
+    const ADJ = ['brave', 'sunny', 'clever', 'gentle', 'merry', 'swift', 'quiet', 'bright', 'kind', 'bold',
+      'jolly', 'lucky', 'calm', 'eager', 'fuzzy', 'happy', 'noble', 'proud', 'witty', 'zesty'];
+    const ANIMALS = ['otter', 'panda', 'fox', 'heron', 'badger', 'llama', 'robin', 'turtle', 'moose', 'wren',
+      'lynx', 'koala', 'puffin', 'ferret', 'marmot', 'osprey', 'beaver', 'sparrow', 'walrus', 'gecko'];
+
+    const pick = (arr) => arr[crypto.getRandomValues(new Uint32Array(1))[0] % arr.length];
+
+    function makeTeamName(existing) {
+      for (let i = 0; i < 200; i++) {
+        const n = pick(ADJ) + '-' + pick(ANIMALS);
+        if (!existing.some(t => t.teamName === n)) return n;
+      }
+      return 'team-' + Date.now().toString(36);
+    }
+
+    function makeSecretCode() {
+      return String(crypto.getRandomValues(new Uint32Array(1))[0] % 1000000).padStart(6, '0');
+    }
+
+    /* ── disk ────────────────────────────────────────────────────────────────── */
+
+    async function dir(parent, name) { return parent.getDirectoryHandle(name, { create: true }); }
+    async function writeJson(d, name, obj) { return writeBytes(d, name, new TextEncoder().encode(JSON.stringify(obj, null, 2))); }
+    async function writeBytes(d, name, bytes) {
+      const fh = await d.getFileHandle(name, { create: true });
+      const w = await fh.createWritable();
+      await w.write(bytes);
+      await w.close();
+    }
+    async function readJson(d, name) {
+      try {
+        const fh = await d.getFileHandle(name);
+        return JSON.parse(await (await fh.getFile()).text());
+      } catch { return null; }
+    }
+    async function fileExists(d, name) {
+      try { await d.getFileHandle(name); return true; } catch { return false; }
+    }
+
+    /* ── relay ───────────────────────────────────────────────────────────────── */
+
+    // Google first, passphrase second. The Worker tells them apart by the "pass:"
+    // prefix — anything else it treats as a Google ID token and verifies properly.
+    function teacherAuthHeader() {
+      const cred = T.idToken ? T.idToken : (T.pass ? 'pass:' + T.pass : '');
+      return { 'Authorization': 'Bearer ' + cred };
+    }
+
+    async function relay(path, { method = 'GET', auth, body = null, binary = false } = {}) {
+      const headers = { 'X-Team-Auth': auth };
+      if (body && !binary) headers['Content-Type'] = 'application/json';
+      return fetch(WORKER + path, {
+        method, headers,
+        body: binary ? body : (body ? JSON.stringify(body) : null),
+      });
+    }
+
+    /* ── collect one team ────────────────────────────────────────────────────────
+       Skips the download entirely when the revision hasn't moved. Without that, ten
+       teams × every 5 minutes would drag gigabytes a day onto the teacher's disk
+       re-fetching stories that hadn't changed.
+       ─────────────────────────────────────────────────────────────────────────── */
+    async function collectTeam(team) {
+      const keys = await SproutSync.deriveKeys(team.teamName, team.secretCode);
+      const rec = T.klass.teams[team.teamName] || (T.klass.teams[team.teamName] = { teamName: team.teamName, lastRev: 0 });
+
+      const sres = await relay('/sync/state', { auth: keys.authToken });
+      if (!sres.ok) throw new Error((await sres.json()).error || 'relay unreachable');
+      const state = await sres.json();
+
+      // Record the check itself, whether or not anything came back. Otherwise the
+      // card keeps showing the time of the last CHANGE and drifts ever more stale,
+      // which reads as "the teacher page has stopped collecting" when in fact it is
+      // checking perfectly and the student simply hasn't drawn anything new.
+      rec.lastCheckedAt = new Date().toISOString();
+      rec.error = null;
+      // What the relay says this team is ACTUALLY set to — the authority, not the
+      // local setting. Recorded on every check so tierDrift() can tell the teacher
+      // when a team has fallen out of step with the rest of the class.
+      rec.contentTier = state.contentTier || DEFAULT_TIER;
+
+      if (state.rev === 0) { rec.status = 'empty'; return false; }
+      if (state.rev === rec.lastRev) { rec.status = 'ok'; return false; }   // nothing new
+
+      const mres = await relay('/sync/manifest', { auth: keys.authToken });
+      if (!mres.ok) throw new Error('could not download the story');
+      const manifest = JSON.parse(new TextDecoder().decode(
+        await SproutSync.decrypt(keys.encKey, new Uint8Array(await mres.arrayBuffer()))
+      ));
+
+      // Images are content-addressed and shared across every team and every snapshot,
+      // so an image already on disk is never downloaded again.
+      const blobsDir = await dir(T.root, 'images');
+      const blobs = new Map();
+      for (const [hash, info] of Object.entries(manifest.blobs || {})) {
+        const ext = (info.mime || 'image/png').split('/')[1].replace('jpeg', 'jpg');
+        const fname = hash + '.' + ext;
+
+        if (await fileExists(blobsDir, fname)) {
+          const f = await (await blobsDir.getFileHandle(fname)).getFile();
+          blobs.set(hash, { bytes: new Uint8Array(await f.arrayBuffer()), mime: info.mime });
+          continue;
+        }
+
+        const bres = await relay('/sync/blob/' + info.id, { auth: keys.authToken });
+        if (!bres.ok) throw new Error('a picture is missing — will retry');   // torn state; abort, don't write
+        const bytes = await SproutSync.decrypt(keys.encKey, new Uint8Array(await bres.arrayBuffer()));
+        await writeBytes(blobsDir, fname, bytes);
+        blobs.set(hash, { bytes, mime: info.mime });
+      }
+
+      const story = await SproutSync.rehydrate(manifest.story, blobs);
+
+      const teamsDir = await dir(T.root, 'teams');
+      const tDir = await dir(teamsDir, team.teamName);
+
+      // latest.json is fat and self-contained on purpose: the teacher can open it
+      // straight in the Studio with no extra steps.
+      await writeJson(tDir, 'latest.json', story);
+
+      // Snapshots keep the REF form instead — a few KB each, sharing images/. Writing
+      // the full 50MB story 12×/hour × 10 teams would be gigabytes a day.
+      const snapDir = await dir(tDir, 'snapshots');
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+      await writeJson(snapDir, stamp + '.json', manifest);
+
+      rec.lastRev = state.rev;
+      rec.lastUpdatedAt = state.updatedAt;     // server time — never a student's clock
+      rec.lastPulledAt = new Date().toISOString();
+      rec.storyTitle = story.title || 'Untitled';
+      rec.slideCount = (story.slides || []).length;
+      rec.imageCount = Object.keys(manifest.blobs || {}).length;
+      rec.thumb = (story.slides || []).map(s => s.thumb).find(Boolean) || null;
+      rec.status = 'ok';
+      rec.error = null;
+
+      // Which images in images/ this team relies on. Images are shared between
+      // teams, so this is the only way to know later whether a given file is
+      // still needed by somebody or is a true orphan.
+      rec.blobHashes = Object.keys(manifest.blobs || {});
+      return true;
+    }
+
+    // Delete images that no remaining team references. Runs after a team is
+    // removed. Bails out entirely if any team's references are unknown — an
+    // orphaned image wastes a few megabytes, but deleting one a story still needs
+    // silently breaks that story, and only one of those is recoverable.
+    async function pruneImages() {
+      const teams = Object.values(T.klass.teams || {});
+      const collected = teams.filter(t => t.lastRev > 0);
+      if (collected.some(t => !Array.isArray(t.blobHashes))) {
+        log('skipped image cleanup — some teams were collected before image tracking existed');
+        return 0;
+      }
+
+      const needed = new Set();
+      for (const t of collected) for (const h of t.blobHashes) needed.add(h);
+
+      const imagesDir = await dir(T.root, 'images');
+      let removed = 0;
+      const doomed = [];
+      for await (const [name, handle] of imagesDir.entries()) {
+        if (handle.kind !== 'file') continue;
+        const hash = name.replace(/\.[^.]+$/, '');
+        if (!needed.has(hash)) doomed.push(name);
+      }
+      for (const name of doomed) {
+        try { await imagesDir.removeEntry(name); removed++; } catch {}
+      }
+      return removed;
+    }
+
+    // Always says what it did. A collect that silently finds nothing new looks
+    // identical to a collect that's broken, and the teacher has no way to tell
+    // them apart — so spell out the outcome every time, including "nothing new".
+    async function collectAll({ quiet = false } = {}) {
+      if (!T.root || !T.teacher) return;
+      if (collecting) return;                 // a check is already running
+      collecting = true;
+
+      const btn = $('sync-now');
+      if (!quiet) {
+        btn.disabled = true;
+        btn.textContent = 'Collecting…';
+        hideErr('class-err');
+      }
+
+      if (!T.teacher.teams.length) {
+        if (!quiet) setCollectStatus('No teams yet — create one first.');
+        btn.disabled = false;
+        btn.textContent = 'Collect work now';
+        collecting = false;
+        return;
+      }
+
+      let changed = 0, empty = 0, failed = 0;
+      for (const team of T.teacher.teams) {
+        try {
+          if (await collectTeam(team)) { changed++; log('collected ' + team.teamName); }
+          else if ((T.klass.teams[team.teamName] || {}).lastRev > 0) { /* already up to date */ }
+          else empty++;
+        } catch (e) {
+          failed++;
+          const rec = T.klass.teams[team.teamName] || (T.klass.teams[team.teamName] = { teamName: team.teamName, lastRev: 0 });
+          rec.status = 'error';
+          rec.error = e.message;
+          log('!! ' + team.teamName + ': ' + e.message);
+        }
+      }
+
+      T.klass.updatedAt = new Date().toISOString();
+      await writeJson(T.root, 'class.json', T.klass);
+      renderTeams();
+      renderTierBar();   // every team just reported its real level — surface any drift
+
+      // Be precise about what "nothing new" means. The teacher can only ever
+      // collect what a student has SENT — and students send a few seconds after
+      // they stop drawing, not the instant they draw. Saying "up to date" when the
+      // truth is "they haven't sent it yet" makes a working system look broken.
+      const bits = [];
+      if (changed) bits.push('Collected new work from ' + changed + ' team' + (changed > 1 ? 's' : ''));
+      if (failed)  bits.push(failed + ' failed');
+      if (!changed && !failed) {
+        bits.push(empty === T.teacher.teams.length
+          ? 'Nothing sent yet — work arrives a few seconds after a student stops drawing'
+          : 'Nothing new since the last check');
+      }
+      const msg = bits.join(' · ');
+
+      // A background check only speaks up when it has something to say. Flashing
+      // "nothing new" every thirty seconds would be noise, and would train the
+      // teacher to ignore the one line that matters.
+      if (!quiet || changed || failed) {
+        setCollectStatus(msg, failed ? 'err' : (changed ? 'ok' : ''));
+        log(msg);
+      }
+
+      btn.disabled = false;
+      btn.textContent = 'Collect work now';
+      collecting = false;
+    }
+    let collecting = false;
+
+    let collectStatusTimer = null;
+    function setCollectStatus(msg, kind) {
+      const el = $('collect-status');
+      el.textContent = msg;
+      el.className = 'collect-status ' + (kind || '');
+      clearTimeout(collectStatusTimer);
+      collectStatusTimer = setTimeout(() => { el.textContent = ''; }, 8000);
+    }
+
+    /* ── render ──────────────────────────────────────────────────────────────── */
+
+    // Story titles are typed by CHILDREN and land in this page's HTML. Without
+    // escaping, a title like `<img src=x onerror=...>` would execute right here on
+    // the teacher's dashboard — and stray markup would wreck the card layout too.
+    // Never interpolate student-controlled text into innerHTML raw.
+    function showLightbox(src, caption) {
+      if (!src) return;
+      $('lb-img').src = src;
+      $('lb-cap').textContent = caption || '';
+      $('lightbox').classList.add('open');
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/[&<>"']/g, c => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+      ));
+    }
+
+    function renderTeams() {
+      const wrap = $('teams');
+      wrap.innerHTML = '';
+      if (!T.teacher) return;
+
+      for (const team of T.teacher.teams) {
+        const rec = (T.klass.teams || {})[team.teamName] || {};
+        const el = document.createElement('div');
+        el.className = 'team';
+
+        // Show when the CHILD last changed their story (server time — never their
+        // clock), not when the file was last written. "Collected 8 minutes ago" is
+        // an answer to a question no teacher is asking; "worked on 8 minutes ago"
+        // tells them whether that group is actually doing anything.
+        const changedMin = rec.lastUpdatedAt ? Math.round((Date.now() - rec.lastUpdatedAt) / 60000) : null;
+        const dot = rec.status === 'error' ? 'err'
+          : (changedMin !== null && changedMin < 15 ? 'fresh' : (rec.lastRev ? 'stale' : ''));
+
+        const meta = rec.status === 'error' ? rec.error
+          : rec.lastRev
+            ? (rec.slideCount + ' page' + (rec.slideCount === 1 ? '' : 's') + ' · worked on '
+               + (changedMin < 1 ? 'just now' : changedMin < 60 ? changedMin + ' min ago'
+                  : Math.round(changedMin / 60) + ' hr ago'))
+            : 'Nothing sent yet';
+
+        // Only rec.thumb is trusted as a URL, and only because it is a data: URL we
+        // produced ourselves from the decrypted story. Everything else is escaped.
+        const safeThumb = (typeof rec.thumb === 'string' && rec.thumb.startsWith('data:image/'))
+          ? rec.thumb : null;
+
+        el.innerHTML = `
+      <div class="team-thumb">${safeThumb ? `<img src="${safeThumb}" alt="">` : '<span>No pages yet</span>'}</div>
+      <div class="team-body">
+        <div class="team-name">${esc(team.teamName)}</div>
+        <div class="team-title">${esc(rec.storyTitle || '—')}</div>
+        <div class="team-meta"><span class="dot ${dot}"></span><span>${esc(meta)}</span></div>
+        <div class="code hidden">Click to show the secret code</div>
+        <div class="team-actions"><button class="del-link">Delete team</button></div>
+      </div>`;
+
+        el.querySelector('.del-link').onclick = () => askDelete(team);
+
+        const img = el.querySelector('.team-thumb img');
+        if (img) img.onclick = () => showLightbox(safeThumb, team.teamName + ' — ' + (rec.storyTitle || ''));
+
+        const codeEl = el.querySelector('.code');
+        codeEl.onclick = () => {
+          if (codeEl.classList.contains('hidden')) {
+            codeEl.classList.remove('hidden');
+            codeEl.textContent = team.secretCode;
+          } else {
+            navigator.clipboard?.writeText(team.secretCode);
+            codeEl.textContent = 'Copied!';
+            setTimeout(() => { codeEl.textContent = team.secretCode; }, 1200);
+          }
+        };
+        wrap.appendChild(el);
+      }
+    }
+
+    /* ── setup steps ─────────────────────────────────────────────────────────── */
+
+    async function onSignedIn(email) {
+      T.email = email;
+      $('who').textContent = email;
+      $('step-signin').classList.add('done');
+      $('pick-folder').disabled = false;
+      $('g-btn').innerHTML = '';
+      $('switch-signin').classList.remove('hide');
+    }
+
+    // A saved passphrase signs you straight back in, which is what you want day
+    // to day — but it also means the Google button never gets a chance to appear.
+    // This is the way back out.
+    function switchSignIn() {
+      localStorage.removeItem(LS_PASS);
+      T.pass = null;
+      T.idToken = null;
+      T.email = null;
+      $('who').textContent = '';
+      $('switch-signin').classList.add('hide');
+      $('step-signin').classList.remove('done');
+      $('pick-folder').disabled = true;
+      hideErr('setup-err');
+      renderSignIn();
+    }
+
+    async function pickFolder() {
+      hideErr('setup-err');
+      try {
+        T.root = await window.showDirectoryPicker({ id: 'sprout-class', mode: 'readwrite' });
+      } catch { return; }   // the teacher cancelled — not an error
+
+      $('step-folder').classList.add('done');
+      $('folder-note').classList.add('hide');
+
+      T.teacher = await readJson(T.root, 'teacher.json') || {
+        fmt: 1, teacherEmail: T.email,
+        settings: { checkEverySec: DEFAULT_CHECK_SEC, contentTier: DEFAULT_TIER },
+        teams: [],
+      };
+      T.klass = await readJson(T.root, 'class.json') || { fmt: 1, teams: {} };
+
+      $('class-panel').classList.remove('hide');
+      $('sync-now').disabled = false;
+      renderTierBar();
+      renderTeams();
+      restartTimer();
+      log('class folder ready — ' + T.teacher.teams.length + ' team(s)');
+      await collectAll();
+    }
+
+    /* ── content level ───────────────────────────────────────────────────────
+       One setting for the whole class. It is stored per TEAM on the relay (that
+       is the only record the Worker can reach when a child asks Pip to draw),
+       so changing it here writes to every team the class has.
+
+       This list must stay in step with CONTENT_TIERS in pip-worker.js. Only the
+       ids are load-bearing — the Worker validates against its own copy and
+       rejects anything it doesn't recognise, so a drifted label here is a
+       cosmetic bug, never a safety one.
+       ─────────────────────────────────────────────────────────────────────── */
+    const TIER_UI = [
+      { id: 'restrictive', label: 'Restrictive', grades: 'Kindergarten – Grade 2',
+        blurb: 'Warm and calm. No weapons at all — not even a storybook sword — nothing spooky, nobody in danger.' },
+      { id: 'moderate',    label: 'Moderate',    grades: 'Grades 3 – 5',
+        blurb: 'Classic storybook adventure. A sword or bow may be carried but never used on anyone; mild peril; gentle monsters.' },
+      { id: 'permissive',  label: 'Permissive',  grades: 'Grade 6',
+        blurb: 'The most relaxed level. Menacing villains and an implied confrontation — never contact, never injury.' },
+    ];
+    const DEFAULT_TIER = 'restrictive';
+
+    const currentTier = () => {
+      const t = T.teacher?.settings?.contentTier;
+      return TIER_UI.some(x => x.id === t) ? t : DEFAULT_TIER;
+    };
+
+    function setLevelStatus(msg, kind) {
+      const el = $('level-status');
+      el.textContent = msg || '';
+      el.className = 'level-status' + (kind ? ' ' + kind : '');
+    }
+
+    // Teams whose relay record disagrees with the class setting — a team created
+    // while the relay was unreachable, or an apply that half-failed. Surfaced
+    // rather than hidden, because a teacher who thinks the class is on Gentle
+    // when one machine is on Adventure has no way to notice otherwise.
+    function tierDrift() {
+      const want = currentTier();
+      return (T.teacher?.teams || []).filter(t => {
+        const seen = T.klass?.teams?.[t.teamName]?.contentTier;
+        return seen && seen !== want;
+      });
+    }
+
+    function renderTierBar() {
+      const sel = $('content-tier');
+      if (!sel.options.length) {
+        for (const t of TIER_UI) {
+          const o = document.createElement('option');
+          o.value = t.id;
+          o.textContent = t.label + ' — ' + t.grades;
+          sel.appendChild(o);
+        }
+      }
+      const cur = currentTier();
+      sel.value = cur;
+      sel.disabled = !T.teacher;
+      $('level-blurb').textContent = TIER_UI.find(t => t.id === cur).blurb;
+
+      const drift = tierDrift();
+      if (drift.length) {
+        setLevelStatus(drift.length + ' team(s) not on this level — re-pick to apply', 'err');
+      }
+    }
+
+    async function applyTier(tier) {
+      const sel = $('content-tier');
+      const teams = T.teacher?.teams || [];
+
+      T.teacher.settings = T.teacher.settings || {};
+      T.teacher.settings.contentTier = tier;
+      await writeJson(T.root, 'teacher.json', T.teacher);
+      $('level-blurb').textContent = TIER_UI.find(t => t.id === tier).blurb;
+
+      if (!teams.length) { setLevelStatus('saved', 'ok'); return; }
+
+      sel.disabled = true;
+      setLevelStatus('applying…');
+      let ok = 0;
+      const failed = [];
+      for (const team of teams) {
+        try {
+          const keys = await SproutSync.deriveKeys(team.teamName, team.secretCode);
+          const res = await fetch(WORKER + '/sync/policy', {
+            method: 'POST',
+            headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ authToken: keys.authToken, tier }),
+          });
+          if (!res.ok) throw new Error((await res.json()).error || 'relay refused');
+          ok++;
+          const rec = T.klass.teams[team.teamName] || (T.klass.teams[team.teamName] = { teamName: team.teamName, lastRev: 0 });
+          rec.contentTier = tier;
+        } catch (e) {
+          failed.push(team.teamName + ' (' + e.message + ')');
+        }
+      }
+      sel.disabled = false;
+      await writeJson(T.root, 'class.json', T.klass);
+
+      if (failed.length) {
+        setLevelStatus(ok + ' of ' + teams.length + ' applied', 'err');
+        showErr('class-err', 'Could not set the level on: ' + failed.join(', ') + '. Pick the level again to retry.');
+      } else {
+        // Students already drawing keep the old level for up to a minute — the
+        // Worker caches the lookup so it isn't re-reading the team record on
+        // every single picture. Say so rather than let a teacher wonder.
+        setLevelStatus('applied to ' + ok + ' team(s)', 'ok');
+        log('content level set to ' + tier + ' for ' + ok + ' team(s) — takes up to a minute to reach students already drawing');
+        setTimeout(() => setLevelStatus(''), 6000);
+      }
+    }
+
+    async function onTierChange() {
+      hideErr('class-err');
+      const tier = $('content-tier').value;
+      if (!TIER_UI.some(t => t.id === tier)) return;
+      try { await applyTier(tier); }
+      catch (e) { setLevelStatus('failed', 'err'); showErr('class-err', e.message); }
+    }
+
+    async function newTeam() {
+      hideErr('class-err');
+      const teamName = makeTeamName(T.teacher.teams);
+      const secretCode = makeSecretCode();
+
+      try {
+        // Both sides derive the same token from (team name, code) alone — no key is
+        // ever exchanged. Registering is what makes the team exist on the relay; every
+        // other route 403s on a prefix no signed-in teacher has created.
+        const keys = await SproutSync.deriveKeys(teamName, secretCode);
+        const res = await fetch(WORKER + '/sync/register', {
+          method: 'POST',
+          headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+          // A new team starts at the class's current level, not at the default —
+          // otherwise adding a machine mid-term would silently put that one child
+          // on different rules from everyone else.
+          body: JSON.stringify({ authToken: keys.authToken, tier: currentTier() }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'could not create the team');
+
+        T.teacher.teams.push({ teamName, secretCode, createdAt: new Date().toISOString() });
+        await writeJson(T.root, 'teacher.json', T.teacher);
+
+        const rec = T.klass.teams[teamName] || (T.klass.teams[teamName] = { teamName, lastRev: 0 });
+        rec.contentTier = currentTier();
+        await writeJson(T.root, 'class.json', T.klass);
+
+        $('nt-name').textContent = teamName;
+        $('nt-code').textContent = secretCode;
+        $('new-team-card').classList.remove('hide');
+        renderTeams();
+        log('created team ' + teamName);
+      } catch (e) {
+        // A stored passphrase that the Worker rejects would otherwise leave the
+        // teacher permanently stuck — we'd keep replaying the bad one on every
+        // visit and never offer the prompt again. Drop it and let them re-enter.
+        if (T.pass && /passphrase/i.test(e.message)) {
+          localStorage.removeItem(LS_PASS);
+          T.pass = null;
+          $('step-signin').classList.remove('done');
+          $('who').textContent = '';
+          renderSignIn();
+        }
+        showErr('class-err', e.message);
+      }
+    }
+
+    /* ── delete a team ───────────────────────────────────────────────────────
+       A team lives in three places, and leaving any of them behind is its own
+       kind of mess: the relay would keep encrypted blobs nobody can ever open
+       again, and the disk would keep stories for a team that no longer exists.
+       ─────────────────────────────────────────────────────────────────────── */
+
+    let pendingDelete = null;
+
+    function askDelete(team) {
+      pendingDelete = team;
+      $('del-name').textContent = team.teamName;
+      $('del-confirm-name').textContent = team.teamName;
+      $('del-input').value = '';
+      $('del-go').disabled = true;
+      hideErr('del-err');
+      $('confirm-back').classList.add('open');
+      $('del-input').focus();
+    }
+
+    function closeDelete() {
+      $('confirm-back').classList.remove('open');
+      pendingDelete = null;
+    }
+
+    async function doDelete() {
+      const team = pendingDelete;
+      if (!team) return;
+
+      const btn = $('del-go');
+      btn.disabled = true;
+      btn.textContent = 'Deleting…';
+      hideErr('del-err');
+
+      try {
+        // 1. The relay first. If this fails we stop and change nothing locally —
+        //    better a team that still exists than a teacher.json with no code for
+        //    blobs that are still sitting in the bucket.
+        const keys = await SproutSync.deriveKeys(team.teamName, team.secretCode);
+        const res = await fetch(WORKER + '/sync/delete', {
+          method: 'POST',
+          headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authToken: keys.authToken }),
+        });
+        if (!res.ok) throw new Error((await res.json()).error || 'could not erase the team from the relay');
+        const { deleted } = await res.json();
+
+        // 2. The collected work on this computer. Only "it was never there" is an
+        //    acceptable failure — anything else means we did NOT delete what we
+        //    said we deleted, and the teacher needs to hear about it.
+        try {
+          const teamsDir = await dir(T.root, 'teams');
+          await teamsDir.removeEntry(team.teamName, { recursive: true });
+        } catch (e) {
+          if (e.name !== 'NotFoundError') throw new Error('Erased from the relay, but could not delete the folder on this computer: ' + e.message);
+        }
+
+        // 3. The bookkeeping — before pruning, so pruneImages() sees the team as
+        //    already gone and its images as unreferenced.
+        T.teacher.teams = T.teacher.teams.filter(t => t.teamName !== team.teamName);
+        delete T.klass.teams[team.teamName];
+        await writeJson(T.root, 'teacher.json', T.teacher);
+        await writeJson(T.root, 'class.json', T.klass);
+
+        // 4. Images that no surviving team still needs.
+        const pruned = await pruneImages();
+
+        log('deleted team ' + team.teamName + ' — ' + deleted + ' erased from the relay, '
+            + pruned + ' unused image(s) removed from this computer');
+        closeDelete();
+        renderTeams();
+      } catch (e) {
+        showErr('del-err', e.message);
+      } finally {
+        btn.textContent = 'Delete forever';
+        btn.disabled = false;
+      }
+    }
+
+    // Checking costs one small metadata read per team, and downloads only happen when
+    // a student actually changed something — so 30s is nearly free and makes the board
+    // feel live. Still overridable by hand in teacher.json for an unusually large class.
+    const DEFAULT_CHECK_SEC = 30;
+
+    function restartTimer() {
+      clearInterval(T.timer);
+      const sec = Number(T.teacher?.settings?.checkEverySec) || DEFAULT_CHECK_SEC;
+
+      // Background checks run quietly: no button flicker, no status line flashing
+      // every thirty seconds. They only announce themselves when work arrives.
+      //
+      // And they stop entirely when nobody is looking. A dashboard left open over a
+      // weekend would otherwise poll the relay a hundred thousand times to tell an
+      // empty room that nothing has changed.
+      T.timer = setInterval(() => {
+        if (document.visibilityState === 'visible') collectAll({ quiet: true });
+      }, sec * 1000);
+    }
+
+    // Coming back to the tab: check straight away rather than waiting out the rest
+    // of the interval, so the board is current by the time the teacher has looked at it.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && T.root && T.teacher) {
+        collectAll({ quiet: true });
+      }
+    });
+
+    // The cards show relative times ("worked on 3 min ago"), which would otherwise
+    // sit frozen at whatever they said during the last collect and look stuck.
+    setInterval(() => { if (T.teacher) renderTeams(); }, 30000);
+
+    /* ── boot ────────────────────────────────────────────────────────────────── */
+
+    window.onGoogleSignIn = (resp) => {
+      T.idToken = resp.credential;
+      T.pass = null;
+      const claims = JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      onSignedIn(claims.email);
+    };
+
+    // The fallback. Verified lazily — we can't check a passphrase without asking
+    // the Worker to do something, so the first "New team" is what confirms it.
+    // A wrong one surfaces there as a plain "that passphrase is not correct".
+    function usePassphrase(pass) {
+      T.pass = pass;
+      T.idToken = null;
+      localStorage.setItem(LS_PASS, pass);
+      onSignedIn('Signed in with passphrase');
+    }
+
+    function renderSignIn() {
+      const box = $('g-btn');
+      box.innerHTML = '';
+
+      if (GOOGLE_CLIENT_ID) {
+        const slot = document.createElement('div');
+        box.appendChild(slot);
+
+        const or = document.createElement('span');
+        or.className = 'or';
+        or.textContent = 'or';
+        box.appendChild(or);
+
+        const tryInit = () => {
+          if (!window.google?.accounts?.id) return setTimeout(tryInit, 100);
+          google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: window.onGoogleSignIn });
+          google.accounts.id.renderButton(slot, {
+            theme: 'outline', size: 'large', shape: 'pill',
+            text: 'signin_with', logo_alignment: 'center',
+          });
+        };
+        tryInit();
+      }
+
+      // The passphrase is the fallback, so it reads as a quiet link rather than a
+      // second competing button — but it is always reachable, because a broken
+      // OAuth config must never lock a teacher out of their own class.
+      const link = document.createElement('button');
+      link.className = 'pass-link';
+      link.textContent = GOOGLE_CLIENT_ID ? 'use a passphrase' : 'Sign in with passphrase';
+      link.onclick = () => {
+        const pass = prompt('Teacher passphrase:');
+        if (pass && pass.trim()) usePassphrase(pass.trim());
+      };
+      box.appendChild(link);
+    }
+
+    window.addEventListener('load', () => {
+      if (typeof SproutSync === 'undefined' || SproutSync.VERSION !== REQUIRE_SYNC_VERSION) {
+        showErr('setup-err',
+          'This page is out of date. Press Ctrl+Shift+R to reload it properly. ' +
+          '(Refusing to continue: an out-of-date copy could fail to open your students\' work.)');
+        return;
+      }
+      if (!window.showDirectoryPicker) {
+        showErr('setup-err', 'This page needs Chrome or Edge — Firefox and Safari cannot save to a folder on your computer.');
+        return;
+      }
+
+      // A passphrase from a previous visit gets us straight back in.
+      const saved = localStorage.getItem(LS_PASS);
+      if (saved) { usePassphrase(saved); return; }
+
+      renderSignIn();
+    });
+
+    $('pick-folder').onclick = pickFolder;
+    $('switch-signin').onclick = switchSignIn;
+    $('new-team').onclick = newTeam;
+    $('content-tier').onchange = onTierChange;
+    $('del-cancel').onclick = closeDelete;
+    $('del-go').onclick = doDelete;
+    $('lightbox').onclick = () => $('lightbox').classList.remove('open');
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') $('lightbox').classList.remove('open');
+    });
+
+    // The button stays dead until the name matches exactly. Case-insensitive, so
+    // this is friction against an accidental click, not a typing test.
+    $('del-input').oninput = () => {
+      const typed = $('del-input').value.trim().toLowerCase();
+      const want = (pendingDelete?.teamName || '').toLowerCase();
+      $('del-go').disabled = !want || typed !== want;
+    };
+    $('del-input').onkeydown = (e) => {
+      if (e.key === 'Enter' && !$('del-go').disabled) doDelete();
+      if (e.key === 'Escape') closeDelete();
+    };
+    $('sync-now').onclick = collectAll;
+  </script>
+</body>
+
+</html>
