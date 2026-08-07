@@ -18,7 +18,7 @@ It also has a **Teacher Mode**: a teacher collects every child's work onto their
 | `sprout-sync-test.html` | Test harness for the above. Open it, click *Run tests*. |
 | `cloudflare-worker/pip-worker.js` | The OpenAI proxy **and** the sync relay. |
 | `pii-filter-test.html` | Test harness for the personal-info filter. Open it, click *Run tests*. |
-| `tests/` | Over-delivery audit — design, protocol, codebook, stimuli, pilot results. |
+| `tests/content_safeguard_audit/` | Content-safeguard audit — protocol, stimuli, runner, and two rounds of results. |
 
 ⚠️ If a task mentions "the workshop", it means `workshop-plugin.html`. An older
 `workshop.html` (a standalone Stability AI version) used to sit alongside it and
@@ -49,6 +49,19 @@ Browser app → **Cloudflare Worker** (`https://storysprout-pip.jackwangxyw.work
   measured comparison that picked it is in a comment right there.
 - Worker routes: `/chat`, `/image`, `/image-edit`, and `/sync/*` for Teacher Mode.
 - The Worker is deployed by **pasting it into the Cloudflare dashboard** — no wrangler, no bundler, so it must stay a single dependency-free file. The repo copy and the deployed copy drift easily; the repo is the source of truth.
+- The site is served from GitHub Pages at `https://kmicodebase.github.io/kmi_story_sprout_studio/`.
+
+⚠️ **Three separate allowlists gate that origin, and only one of them is in this repo.**
+Changing where the site is served from means updating all three:
+
+1. `ALLOWED_ORIGINS` in `pip-worker.js` → gates `/chat`, `/image`, all of `/sync`.
+   **Order matters** — `corsHeaders()` pins disallowed requests to `ALLOWED_ORIGINS[0]`,
+   so the current site stays first. Editing this file changes nothing until it is pasted.
+2. **Authorized JavaScript origins** on the Google OAuth client — Google Cloud
+   Console, *not in this repo*. Gates teacher sign-in only, so forgetting it fails
+   **quietly**: every part of `teacher.html` works except the Google button, and the
+   passphrase fallback still signs a teacher in. It reads like a Google outage.
+3. GitHub Pages source (Settings → Pages), branch `main`, root.
 
 ### Global state (`workshop-plugin.html`)
 
@@ -161,6 +174,20 @@ All colours/spacing are CSS custom properties on `:root` (`--purple`, `--cream`,
   and it carries the reasoning for each rule in comments beside it. This file
   used to claim the two were mirrored; they were not, and pretending otherwise
   sent readers to a stale document. Change behaviour in the Worker.
-- `tests/` — the over-delivery audit: whether the content levels hold, and
-  whether the renderer draws things nobody asked for. `tests/TEST_PLAN.md` first.
+- `tests/content_safeguard_audit/` — does the constraint appended to every image
+  request block what it should *without* sanding off the scary, sad and gross
+  content children legitimately write? Two rounds, 480 trials.
+  `tests/content_safeguard_audit/FINDINGS.md` first.
+
+  Its headline result constrains how you may edit `UNIVERSAL_IMAGE_RULE`: the
+  constraint suppresses the provider's own moderation **in both directions** —
+  it rescues legitimate content the provider would refuse, and carries violating
+  content past the same filter. So the rule cannot rely on the provider as a
+  backstop for anything it does not name itself. Abstract wording measurably
+  failed: "nothing hateful or cruel" did not stop a bullying scene, which is why
+  bullying is now named outright. **Prefer naming a category to gesturing at it.**
+
+  ⚠️ An earlier **over-delivery** audit (`tests/`, with `TEST_PLAN.md` and
+  `CODEBOOK.md`) was removed in this repo — different question, run never
+  completed. Older commits and docs may still reference it; it is not coming back.
 - `RESEARCH_DATA.md` — schema for the prompt-writing research data captured in the story file.

@@ -9,7 +9,7 @@ parameter-rejection handling, recorded identically).
 
 ## THE FREEZE GATE (this is the entire methodological point)
 ```bash
-git clone https://github.com/lzhangsktlab/story-sprout && cd story-sprout
+git clone https://github.com/kmicodebase/kmi_story_sprout_studio && cd kmi_story_sprout_studio
 git rev-parse HEAD
 sha256sum on the extracted PIP_SYSTEM string
 ```

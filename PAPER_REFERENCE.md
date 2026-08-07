@@ -10,7 +10,7 @@ Every factual claim here was checked against source rather than recalled. Where 
 
 **Scope.** This is organised around agency, not around engineering. Teacher Mode — teams, encryption, the sync protocol — appears only in §6, and only where it bears on the paper: **custody** (who ends up holding the child's work) and the **privacy claims** the manuscript makes. Its internals are deliberately out of scope; they live in `CLAUDE.md`.
 
-A naming note: the repo is `story-sprout`, the product is now **StorySprout Studio** (the two live pages were renamed from "Storybook Workshop"), and the paper says **Story Sprout**. The app name is settled; only the manuscript's **Story Sprout** remains to reconcile before submission.
+A naming note: the repo is `kmi_story_sprout_studio` (moved from `story-sprout`), the product is now **StorySprout Studio** (the two live pages were renamed from "Storybook Workshop"), and the paper says **Story Sprout**. The app name is settled; only the manuscript's **Story Sprout** remains to reconcile before submission.
 
 ---
 

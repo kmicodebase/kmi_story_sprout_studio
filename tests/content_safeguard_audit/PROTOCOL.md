@@ -7,6 +7,12 @@ This is the narrow sibling of the over-delivery audit in `tests/` — one constr
 one age band, binary outcomes plus a single human inspection pass. It does not
 supersede that design; it exists to support one specific sentence in the paper.
 
+<!-- Editorial note, added on the move to this repo: the over-delivery audit this
+     refers to is not carried here — its full run was never authorised. The
+     sentence stands as pre-registered, but "does not supersede that design" now
+     describes a design kept only in the predecessor repository's history. -->
+
+
 ## 1. The claim under test
 
 The paper will say, with numbers in place of brackets:
