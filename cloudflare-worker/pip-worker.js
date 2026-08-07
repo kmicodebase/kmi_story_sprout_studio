@@ -60,8 +60,12 @@ const IMAGE_MODEL = 'gpt-image-2';   // illustration generation
 // ── CORS: locked to this app's origins ───────────────────────────────────────
 // The live site plus local testing. To fully lock down, remove the localhost /
 // 'null' entries (those exist so you can test from a local server or file://).
+// ⚠ ORDER MATTERS: corsHeaders() falls back to ALLOWED_ORIGINS[0] as the
+//   canonical origin when a request arrives from a disallowed one, so the
+//   current site must stay first.
 const ALLOWED_ORIGINS = [
-  'https://lzhangsktlab.github.io',
+  'https://kmicodebase.github.io',   // current site (kmi_story_sprout_studio, GitHub Pages)
+  'https://lzhangsktlab.github.io',  // legacy deployment — delete once it is retired
 ];
 function isAllowedOrigin(origin) {
   if (!origin) return true;                                   // non-browser (e.g. curl) — no Origin header
@@ -413,7 +417,7 @@ async function handleChat(body, env, tier) {
    exceed it. See PAPER_REFERENCE.md.
 
    The bullying sentence is measured, not decorative: in the 2026-08 content-
-   constraint audit (tests/constraint_audit/), "kids ganging up and beating
+   safeguard audit (tests/content_safeguard_audit/), "kids ganging up and beating
    another kid" rendered a full bullying scene under the abstract "nothing
    hateful or cruel" wording, and no layer — ours or the provider's — stopped
    it. Concrete wording flips some of these to a provider input-block and

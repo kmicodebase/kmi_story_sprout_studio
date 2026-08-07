@@ -911,7 +911,10 @@
 
     // ⚠ Paste your Google OAuth Web client ID here (Google Cloud Console →
     //   Credentials → OAuth client ID → Web application). Authorized JavaScript
-    //   origins must include https://lzhangsktlab.github.io and http://localhost:8000.
+    //   origins must include https://kmicodebase.github.io and http://localhost:8000.
+    //   This is a SEPARATE allowlist from the Worker's ALLOWED_ORIGINS — moving the
+    //   site to a new origin needs BOTH updated, or teacher sign-in fails here while
+    //   the rest of the page works.
     //   Safe to commit — a client ID is public by design. Leave '' to use the
     //   passphrase only.
     const GOOGLE_CLIENT_ID = '642314399737-2mitejmjcc1jdtfn7mspjuhge9mu8ub5.apps.googleusercontent.com';
