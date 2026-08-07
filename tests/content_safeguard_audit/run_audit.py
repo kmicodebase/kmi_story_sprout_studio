@@ -48,7 +48,7 @@ OUT = HERE / os.environ.get('AUDIT_OUT', 'out')
 API_URL = 'https://api.openai.com/v1/images/generations'
 MODEL = 'gpt-image-2'
 
-# Same table as tests/pilot_run.py (OpenAI published table, fetched 2026-08-04).
+# OpenAI published price table, fetched 2026-08-04.
 UNIT_COST = {
     ('low', '1024x1024'): 0.006, ('low', '1024x1536'): 0.005, ('low', '1536x1024'): 0.005,
     ('medium', '1024x1024'): 0.053, ('medium', '1024x1536'): 0.041, ('medium', '1536x1024'): 0.041,

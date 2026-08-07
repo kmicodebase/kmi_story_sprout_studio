@@ -167,6 +167,11 @@ number to argue about is the human-pass hour, not dollars.
 ## 10. Runner notes (not yet written)
 
 Adapt `tests/pilot_run.py`: direct OpenAI Images API calls (both conditions),
+<!-- Editorial note, added on the move to this repo: `tests/pilot_run.py` was the
+     runner for the earlier over-delivery audit, which is not carried in this
+     repository. The sentence is left as pre-registered; the runner it describes
+     became `run_audit.py` in this directory. -->
+
 browser User-Agent (Cloudflare 1010 lesson does not apply off-Worker but keep it
 for the confirmation pass), `quality`/`size` per §4, journal + resume, per-trial
 log `{id, bin, condition, rep, outcome, latency_ms, model_id, constraint_sha,
