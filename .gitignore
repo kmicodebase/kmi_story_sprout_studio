@@ -1,0 +1,29 @@
+# ── Secrets — never commit ───────────────────────────────────────────────────
+# This repository is public.
+#
+# .env holds OPENAI_API_KEY, and OPENAI_API_KEY_AUDIT for the content-safeguard
+# audit. Two keys on purpose: the BLOCK set fires violating prompts at the
+# safety stack, and that traffic must not ride the account that serves children.
+.env
+
+# Teacher-team files hold team names AND their six-digit secret codes in
+# plaintext. That code is the ONLY thing protecting a team's encrypted work
+# (19.9 bits — see the entropy note in teacher.html), so a committed copy lets
+# anyone overwrite those teams. Inherited from the deleted tests/.gitignore;
+# kept because the rule is about the file shape, not about which audit made it.
+teams.json
+audit-*/
+
+# ── Audit outputs ────────────────────────────────────────────────────────────
+# Results are committed ON PURPOSE — they are evidence and must be reproducible
+# by others. Tracked, not ignored: model_selection_tests/,
+# scribe_audit_v3_heldout_out/, and the journals, run configs, summaries and
+# contact sheets under tests/content_safeguard_audit/.
+#
+# Only the bulk per-trial images are excluded, by that directory's own
+# .gitignore — ~1.3 GB across the two rounds. Nothing to add here.
+
+# ── Machine noise ────────────────────────────────────────────────────────────
+__pycache__/
+.DS_Store
+.playwright-mcp/

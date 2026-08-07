@@ -1,0 +1,16 @@
+# Normalise text to LF in the repository. Checkouts still get native endings.
+#
+# The blobs here are already LF and always were — this file does not fix a
+# problem, it pins the behaviour so none appears. Without it, normalisation
+# depends on each contributor's core.autocrlf, and one clone committing CRLF is
+# enough to produce a whole-file diff that hides the line which actually
+# changed. On Windows checkouts the working tree is CRLF either way; that is
+# autocrlf doing its job and is not a divergence.
+* text=auto
+
+# Binary — never touch these.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.woff2 binary
+*.ico  binary
