@@ -52,6 +52,24 @@ This repo is also the artifact for a study of **how agency is split between the 
 
 **Paper:** _(link TBD — not yet public)_ · background: [`PAPER_REFERENCE.md`](PAPER_REFERENCE.md).
 
+### If you arrived from the paper
+
+§4 says the testing methods, scripts, data and item-level results live here. This is where:
+
+| Paper | Here |
+|---|---|
+| §3.2 — the one-line constraint, printed in full | `UNIVERSAL_IMAGE_RULE` + the tier suffix in [`cloudflare-worker/pip-worker.js`](cloudflare-worker/pip-worker.js); the exact audited string and its sha256 in [`FROZEN.json`](tests/content_safeguard_audit/FROZEN.json) |
+| §3.3 — the word filter | `UNIVERSAL_BLOCKED`, same file |
+| §3.3 — personal-information removal | [`pii-filter-test.html`](pii-filter-test.html) — open it, click *Run tests* |
+| §4.1 — description fidelity (scribe contract) | harnesses `scribe_audit*.py`; development suite in [`model_selection_tests/`](model_selection_tests/); the held-out run in [`scribe_audit_v3_heldout_out/`](scribe_audit_v3_heldout_out/) |
+| §4.1 — the freeze gate | [`CLAUDE_CODE_AUDIT_V3_HELDOUT_INSTRUCTIONS.md`](CLAUDE_CODE_AUDIT_V3_HELDOUT_INSTRUCTIONS.md) |
+| §4.2 — the content safeguard | [`tests/content_safeguard_audit/`](tests/content_safeguard_audit/) — start at `FINDINGS.md`; protocol, stimuli, runner, journals and per-image judgments alongside |
+
+> ⚠️ **§4.2 in the paper reports round 1 only; this repo reports two rounds.** The
+> numbers therefore differ on purpose — 92.5% keep in the paper against 92.1%
+> pooled here, and round 2 corrected two round-1 claims. `FINDINGS.md` §9–§12
+> covers what changed. See the note below before citing either.
+
 Pip's chat **contract** (the `PIP_SYSTEM` prompt in `pip-worker.js`) and its **model** were chosen by a reproducible audit whose inputs and outputs are committed here, not summarized away:
 
 | Path | What it is |
@@ -170,8 +188,7 @@ Class folder/
 | `teacher.html` | **Teacher Mode dashboard** — create teams, collect student work |
 | `sprout-sync.js` | Shared crypto + content-addressing + relay client (used by **both** pages) |
 | `sprout-sync-test.html` | Test harness for the above — open it and click *Run tests* |
-| `cloudflare-worker/pip-worker.js` | **OpenAI proxy** for Pip **and** the sync relay |
-| `cloudflare-worker/pip-worker.js` | **Pip's behavior spec is the `PIP_SYSTEM` prompt in here** — the source of truth |
+| `cloudflare-worker/pip-worker.js` | **OpenAI proxy** for Pip **and** the sync relay. Also holds `PIP_SYSTEM`, the source of truth for Pip's behaviour |
 | `PIP_SCOPE.md` | Phase 1 design record. Historical; superseded by `PIP_SYSTEM` |
 | `RESEARCH_DATA.md` | Codebook for the local story-file schema (`childWords` vs. the composed prompt; v6) |
 | `scripts/images-to-json.py` | Convert a folder of images into a story JSON |
