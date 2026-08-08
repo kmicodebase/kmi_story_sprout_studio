@@ -30,6 +30,19 @@ audit-*/
 Latest_version.pdf
 latest_version.pdf
 
+# ── Per-machine tool state ───────────────────────────────────────────────────
+# CLAUDE.md itself IS tracked -- it is the architecture doc, and it carries the
+# warnings that are not derivable from the code (the parallel page arrays, the
+# synchronous object:added history trap, the sync version lock). These two are
+# the per-developer half: local permissions and personal scratch notes, which
+# differ per machine and can carry paths or tokens.
+#
+# CLAUDE_CODE_AUDIT_V3_HELDOUT_INSTRUCTIONS.md is NOT tool state despite the
+# name -- it is the pre-registered protocol for the §4.1 audit, cited by
+# scribe_audit_v3_heldout_out/PROTOCOL.md. It stays tracked.
+.claude/
+CLAUDE.local.md
+
 # ── Machine noise ────────────────────────────────────────────────────────────
 __pycache__/
 .DS_Store
