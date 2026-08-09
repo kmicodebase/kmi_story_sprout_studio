@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Story Sprout contract audit - Tier 1 (scribe) + Tier 2 (interaction rules).
+Story Sprout contract evaluation - Tier 1 (scribe) + Tier 2 (interaction rules).
 Runs against the DEPLOYED worker. No child data involved: every turn below is
 researcher-authored. Stdlib only. Cost ~ $0.02, time ~ 2-4 min.
 
@@ -13,10 +13,10 @@ BEFORE RUNNING (the gate):
      as the REPLY TEXT (workshop-plugin.html:3584/3630). If it pushes raw JSON
      instead, set ASSISTANT_ECHO = "json" below.
 
-RUN (production, post-bundle):  python3 scribe_audit.py
+RUN (production, post-bundle):  python3 evaluations/scribe_contract/scribe_eval.py
 RUN (SIMULATED - no production touched; tests the INTENDED contract with the
      bundle pre-applied, calling gpt-4o-mini directly with the worker's exact
-     parameters):               OPENAI_API_KEY=sk-... python3 scribe_audit.py --sim
+     parameters):               OPENAI_API_KEY=sk-... python3 evaluations/scribe_contract/scribe_eval.py --sim
      The key stays an env var on your machine; never paste it anywhere.
      Sim numbers are INTERIM (for drafting); the production re-run before
      submission is the gate and produces the final reported numbers.
@@ -170,7 +170,7 @@ def content(s): return {t for t in toks(s) if t not in STOP and len(t) > 2}
 # this run never touches the Worker (its redaction and length caps are therefore not
 # exercised — no sequence contains PII, so they would be no-ops anyway).
 import os, atexit, hashlib, urllib.error
-WORKER_JS = pathlib.Path(__file__).resolve().parent / "cloudflare-worker" / "pip-worker.js"
+WORKER_JS = pathlib.Path(__file__).resolve().parents[2] / "cloudflare-worker" / "pip-worker.js"
 
 def _load_contract():
     src = WORKER_JS.read_text()
@@ -199,7 +199,7 @@ def call(messages):
     if not key: sys.exit("needs OPENAI_API_KEY in the environment")
     # Exact worker parameters (pip-worker.js handleChat): model,
     # max_completion_tokens, response_format, store:false.
-    # NOTE the deviation from the audit instructions' literal "temperature: 0.5,
+    # NOTE the deviation from the evaluation instructions' literal "temperature: 0.5,
     # max_tokens: 400": the model named in the file is a reasoning model, which
     # rejects BOTH ("temperature does not support 0.5", "'max_tokens' is not
     # supported"). handleChat was updated to match, so this still mirrors the worker

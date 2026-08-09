@@ -4,6 +4,6 @@
 # out of images/ into evidence/ (committed) when the human pass cites them.
 #
 # The glob must cover EVERY round's output root, not just `out/`. Round 2 writes
-# to `out_r2/` (AUDIT_OUT), and a rule anchored to `out/` silently let 348 files
+# to `out_r2/` (EVAL_OUT), and a rule anchored to `out/` silently let 348 files
 # and 789 MB into a commit. Keep this pattern round-agnostic.
 out*/*/images/

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Story Sprout contract audit v2 - 200 scored composition turns per model.
+Story Sprout contract evaluation v2 - 200 scored composition turns per model.
 Runs BOTH the deployed model and its predecessor on the SAME instrument.
 Sequences and scoring are the instrument: DO NOT MODIFY THEM.
 Claude Code writes exactly one function (call_model) per the instructions file.
@@ -260,7 +260,7 @@ def content(s): return {t for t in toks(s) if t not in STOP and len(t) > 2}
 import os, atexit, urllib.request, urllib.error
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
-WORKER_JS = pathlib.Path(__file__).resolve().parent / "cloudflare-worker" / "pip-worker.js"
+WORKER_JS = pathlib.Path(__file__).resolve().parents[2] / "cloudflare-worker" / "pip-worker.js"
 
 def _load_contract():
     src = WORKER_JS.read_text()
@@ -354,7 +354,7 @@ def play(turns, model_cfg):
         time.sleep(0.3)
     return out
 
-def audit(model_cfg, outdir):
+def evaluation(model_cfg, outdir):
     log, tx = [], {}
     S = dict(verb_ok=0, verb_n=0, add=0, add_n=0, omit=0, omit_n=0, notdraw=0,
              ask_ok=0, ask_n=0, cap_ok=0, cap_n=0, rm_ok=0, rm_n=0, comp_ok=0, comp_n=0)
@@ -418,4 +418,4 @@ INTERACTION RULES: judgment {S['ask_ok']}/{S['ask_n']} | bare-subject {S['cap_ok
 
 if __name__ == "__main__":
     for cfg in MODELS:
-        audit(cfg, f"scribe_audit_v2_out_{cfg['name']}")
+        evaluation(cfg, f"scribe_audit_v2_out_{cfg['name']}")

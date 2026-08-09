@@ -1,6 +1,6 @@
 # StorySprout Studio — Paper Reference
 
-**Status:** current as of the `audit/scribe-contract` branch (23 July 2026). Three things changed since the previous revision and are folded in below: the chat model moved to `gpt-5.4-mini`; the legacy manual drawer was **deleted** (not merely hidden); and the scribe tension the paper worries about has now been **measured** (§3, §4).
+**Status:** current as of the `audit/scribe-contract` branch (23 July 2026; a branch name in the predecessor repo, left as-is so it stays findable). Three things changed since the previous revision and are folded in below: the chat model moved to `gpt-5.4-mini`; the legacy manual drawer was **deleted** (not merely hidden); and the scribe tension the paper worries about has now been **measured** (§3, §4).
 
 **What this is.** A verified account of what the system actually does, written for the paper — whose subject is the **allocation of agency between child and model**. It exists because the manuscript describes a system that has since changed underneath it, and because `RESEARCH_DATA.md` is materially out of date. (`HANDOFF.md` and `STYLE_CONSISTENCY.md` were removed from the repo — both described the retired Stability AI system.)
 
@@ -60,9 +60,9 @@ The front end acts on those four fields and nothing else. Parameters: `reasoning
 
 The server can **overrule the model**: `ready` is only true if the model said `true` *and* produced a non-empty `image_prompt`. A malformed reply degrades to a friendly fallback rather than an error.
 
-**`PIP_SCOPE.md` is accurate for §4.2, and only for §4.2.** The greeting and all four rotating reflection questions are still used verbatim — verified by exact string match against `PIP_GREETING` and `PIP_IMAGE_CHECKS` in `workshop-plugin.html`. §4.2 of the paper is correct as written and needs no change.
+**The greeting and all four rotating reflection questions are still used verbatim** — verified by exact string match against `PIP_GREETING` and `PIP_IMAGE_CHECKS` in `workshop-plugin.html`, which are now the only source for that wording. §4.2 of the paper is correct as written and needs no change.
 
-⚠️ It is **not** a current description of Pip's behaviour, and this file used to claim it was "the one document still in sync with the code." That was true when written and is now false: `PIP_SCOPE.md` has not tracked the Worker since June 2026, and is missing the scribe rule, the weapons rules, and the teacher-set content levels. For anything beyond the greeting and the reflection questions, cite `PIP_SYSTEM` in `cloudflare-worker/pip-worker.js`.
+⚠️ A `PIP_SCOPE.md` used to carry that wording and was described here as "the one document still in sync with the code." That stopped being true in June 2026 — it never picked up the scribe rule, the weapons rules, or the teacher-set content levels — and it was deleted in August 2026. For anything beyond the greeting and the reflection questions, cite `PIP_SYSTEM` in `cloudflare-worker/pip-worker.js`.
 
 ### The three rules that do the pedagogical work
 
@@ -78,7 +78,7 @@ The paper's §3 is right that Pip is a scribe, and right to be uneasy about it. 
 
 The system prompt forbids Pip from inventing plot or scene content. Since the scribe-rule update it goes further: the `image_prompt` must **carry the child's details in the child's own words, typos and grammar included, adding nothing** — and it adds **no default style** unless the child asked for one (the earlier "default storybook style" is gone). Assembly is still an act — the model chooses order and joins fragments — so it remains *authorship of the prompt* in the strict sense the paper means. But the room for a normalised phrase to quietly repair an omission is now explicitly forbidden by the contract, not merely discouraged.
 
-**What has changed, and it strengthens the paper considerably:** both strings are recorded (§5), so the scribe tension is not merely acknowledged — it is **measured**. A held-out audit (60 unseen four-turn sequences × 3 stochastic reps, committed under `scribe_audit_v3_heldout_out/`) scores whether the child's exact words survive into the compiled prompt. On the selected configuration the result is **240/240 verbatim across all three reps and 0/720 unrequested additions** — the model carried every seeded typo through and invented nothing. That is a far stronger claim than "we concede a tension": the departure of Pip's prompt from the child's words is now *quantified and near-zero*, and it deserves a results paragraph, not a caveat. The harness and its full protocol are in the repo (`scribe_audit_v3_heldout.py`, `--rescore`; see the README's *Research artifacts*).
+**What has changed, and it strengthens the paper considerably:** both strings are recorded (§5), so the scribe tension is not merely acknowledged — it is **measured**. A held-out evaluation (60 unseen four-turn sequences × 3 stochastic reps, committed under `evaluations/scribe_contract/heldout_results/`) scores whether the child's exact words survive into the compiled prompt. On the selected configuration the result is **240/240 verbatim across all three reps and 0/720 unrequested additions** — the model carried every seeded typo through and invented nothing. That is a far stronger claim than "we concede a tension": the departure of Pip's prompt from the child's words is now *quantified and near-zero*, and it deserves a results paragraph, not a caveat. The harness and its full protocol are in the repo (`evaluations/scribe_contract/scribe_eval_v3_heldout.py`, `--rescore`; see the README's *Research artifacts*).
 
 ---
 
@@ -195,14 +195,14 @@ That is a strong story. But these sentences, which appear in the **Abstract, §3
 | §4.1 | The style menu is *"the studio's one explicit aesthetic control"* | Removed with the drawer. In Pip mode style is conversational, carried forward by the system prompt. |
 | §4.1, §5 | *"a visible history strip"*; a child can *"re-run an unchanged description"* | Removed; the image bank offers **no re-run**. §5's attribution argument describes an affordance that isn't there. |
 | §4.1 | *"the platform appends only that chosen style, a fixed landscape-composition hint, and the safety constraint"* | True of the **removed legacy** path only. Pip sends **no style suffix and no landscape hint** — only the safety clause. (Landscape happens because the API default is 1536×1024.) |
-| §3, §4.3 | The chat model (implied `gpt-4o-mini`) | Now **`gpt-5.4-mini`** (a reasoning model): `reasoning_effort: low`, `max_completion_tokens`, default temperature. The model was chosen by a committed audit (§3, README *Research artifacts*). The public demo may still run the prior model until the worker is redeployed. |
+| §3, §4.3 | The chat model (implied `gpt-4o-mini`) | Now **`gpt-5.4-mini`** (a reasoning model): `reasoning_effort: low`, `max_completion_tokens`, default temperature. The model was chosen by a committed evaluation (§3, README *Research artifacts*). The public demo may still run the prior model until the worker is redeployed. |
 | §4.3 | *"three routes"*; *"stores nothing beyond ephemeral in-memory rate-limit counters"* | Three AI routes **plus ten sync routes**. The worker writes to R2. |
 | §4.3 | *"rate-limits per client IP"* | True for AI routes. Sync is limited **per team** — a classroom shares one NAT IP. |
 | §4.4 | The project file contains *"prompts … settings … revision links, and a log of additions and removals"* | **Aspirational until 14 July 2026.** See §5. Now true — but **only going forward.** |
 | §4.1, §6, Acks | Voice input, framed around fidelity | Until 14 July 2026 the microphone **streamed children's voice audio to Google**. Now on-device, failing closed. Voice is explicitly personal information under the amended COPPA Rule. **Your Ethics statement needs this.** |
 | §7 | *"no telemetry"* | Was **false** — every page load fetched Google Fonts and cdnjs, leaking the child's IP to two third parties. Both now self-hosted. **Now true.** |
 | §5 | *"gpt-image-2 at the time of writing"* | ✅ Correct. |
-| §4.2 | The JSON schema and the three rules | ✅ Correct. The greeting and four reflection questions in `PIP_SCOPE.md` are still verbatim — but nothing else in that file is current; cite `PIP_SYSTEM` for the rest. |
+| §4.2 | The JSON schema and the three rules | ✅ Correct. The greeting and four reflection questions are still verbatim in `PIP_GREETING` / `PIP_IMAGE_CHECKS`; cite `PIP_SYSTEM` for the rest. |
 
 ### Documents to disregard
 

@@ -1,8 +1,8 @@
 # ── Secrets — never commit ───────────────────────────────────────────────────
 # This repository is public.
 #
-# .env holds OPENAI_API_KEY, and OPENAI_API_KEY_AUDIT for the content-safeguard
-# audit. Two keys on purpose: the BLOCK set fires violating prompts at the
+# .env holds OPENAI_API_KEY, and OPENAI_API_KEY_EVAL for the content-safeguard
+# evaluation. Two keys on purpose: the BLOCK set fires violating prompts at the
 # safety stack, and that traffic must not ride the account that serves children.
 .env
 
@@ -10,15 +10,16 @@
 # plaintext. That code is the ONLY thing protecting a team's encrypted work
 # (19.9 bits — see the entropy note in teacher.html), so a committed copy lets
 # anyone overwrite those teams. Inherited from the deleted tests/.gitignore;
-# kept because the rule is about the file shape, not about which audit made it.
+# kept because the rule is about the file shape, not about which evaluation made it.
 teams.json
 audit-*/
+eval-*/
 
-# ── Audit outputs ────────────────────────────────────────────────────────────
+# ── Evaluation outputs ────────────────────────────────────────────────────────────
 # Results are committed ON PURPOSE — they are evidence and must be reproducible
-# by others. Tracked, not ignored: model_selection_tests/,
-# scribe_audit_v3_heldout_out/, and the journals, run configs, summaries and
-# contact sheets under tests/content_safeguard_audit/.
+# by others. Tracked, not ignored: evaluations/scribe_contract/model_selection/,
+# evaluations/scribe_contract/heldout_results/, and the journals, run configs, summaries and
+# contact sheets under evaluations/content_safeguard/.
 #
 # Only the bulk per-trial images are excluded, by that directory's own
 # .gitignore — ~1.3 GB across the two rounds. Nothing to add here.
@@ -37,9 +38,9 @@ latest_version.pdf
 # the per-developer half: local permissions and personal scratch notes, which
 # differ per machine and can carry paths or tokens.
 #
-# CLAUDE_CODE_AUDIT_V3_HELDOUT_INSTRUCTIONS.md is NOT tool state despite the
-# name -- it is the pre-registered protocol for the §4.1 audit, cited by
-# scribe_audit_v3_heldout_out/PROTOCOL.md. It stays tracked.
+# evaluations/scribe_contract/HELDOUT_PROTOCOL.md is NOT tool state despite the
+# name -- it is the pre-registered protocol for the §4.1 evaluation, cited by
+# evaluations/scribe_contract/heldout_results/PROTOCOL.md. It stays tracked.
 .claude/
 CLAUDE.local.md
 

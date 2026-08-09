@@ -1,9 +1,9 @@
 # Held-out verification — protocol
 
 Verbatim answers to the six protocol questions in
-`CLAUDE_CODE_AUDIT_V3_HELDOUT_INSTRUCTIONS.md`.
+`evaluations/scribe_contract/HELDOUT_PROTOCOL.md`.
 
-1. **Suite roles.** The 200-turn v2 suite (`../model_selection_tests/scribe_audit_v2_out_*`)
+1. **Suite roles.** The 200-turn v2 suite (`../evaluations/scribe_contract/model_selection/scribe_audit_v2_out_*`)
    was used for contract development and model selection; this v3 suite was authored
    after selection and supplies the verification numbers. No case in v3 appears in v2.
 
@@ -46,7 +46,7 @@ false positive — the child's word "storybook's" tripping the style flag on H17
 motivated patches 3–4.
 
 **Final, FROZEN for the paper** (all four patches) — `runN/summary_rescored.txt`,
-reproduced by `python3 scribe_audit_v3_heldout.py --rescore`:
+reproduced by `python3 evaluations/scribe_contract/scribe_eval_v3_heldout.py --rescore`:
 
 | rep | verbatim | addition | omission | rules | style |
 |---|---|---|---|---|---|

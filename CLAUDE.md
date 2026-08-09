@@ -18,7 +18,7 @@ It also has a **Teacher Mode**: a teacher collects every child's work onto their
 | `sprout-sync-test.html` | Test harness for the above. Open it, click *Run tests*. |
 | `cloudflare-worker/pip-worker.js` | The OpenAI proxy **and** the sync relay. |
 | `pii-filter-test.html` | Test harness for the personal-info filter. Open it, click *Run tests*. |
-| `tests/content_safeguard_audit/` | Content-safeguard audit — protocol, stimuli, runner, and two rounds of results. |
+| `evaluations/content_safeguard/` | Content-safeguard evaluation — protocol, stimuli, runner, and two rounds of results. |
 
 ⚠️ If a task mentions "the workshop", it means `workshop-plugin.html`. An older
 `workshop.html` (a standalone Stability AI version) used to sit alongside it and
@@ -167,17 +167,20 @@ All colours/spacing are CSS custom properties on `:root` (`--purple`, `--cream`,
 - Delete/Backspace — Delete selected
 
 ## Related docs
-- ⚠️ `PIP_SCOPE.md` — **the Phase 1 design record, NOT the current spec.** It
-  described Pip before the scribe rule and before content levels, and it has not
-  tracked the Worker since June 2026. **`PIP_SYSTEM` in `pip-worker.js` is the
-  source of truth for Pip's behaviour** — it is what actually reaches the model,
-  and it carries the reasoning for each rule in comments beside it. This file
-  used to claim the two were mirrored; they were not, and pretending otherwise
-  sent readers to a stale document. Change behaviour in the Worker.
-- `tests/content_safeguard_audit/` — does the constraint appended to every image
+- ⚠️ **`PIP_SYSTEM` in `pip-worker.js` is the source of truth for Pip's
+  behaviour** — it is what actually reaches the model, and it carries the
+  reasoning for each rule in comments beside it. Change behaviour in the Worker.
+
+  A `PIP_SCOPE.md` used to sit beside it as the Phase 1 design record. It was
+  deleted in August 2026: it had not tracked the Worker since June, was missing
+  the scribe rule, the weapons rules and the content levels, and a stale spec
+  that *looks* authoritative is worse than no spec. The greeting and the four
+  rotating reflection questions it documented are live constants —
+  `PIP_GREETING` and `PIP_IMAGE_CHECKS` in `workshop-plugin.html`.
+- `evaluations/content_safeguard/` — does the constraint appended to every image
   request block what it should *without* sanding off the scary, sad and gross
   content children legitimately write? Two rounds, 480 trials.
-  `tests/content_safeguard_audit/FINDINGS.md` first.
+  `evaluations/content_safeguard/FINDINGS.md` first.
 
   Its headline result constrains how you may edit `UNIVERSAL_IMAGE_RULE`: the
   constraint suppresses the provider's own moderation **in both directions** —
@@ -187,7 +190,7 @@ All colours/spacing are CSS custom properties on `:root` (`--purple`, `--cream`,
   failed: "nothing hateful or cruel" did not stop a bullying scene, which is why
   bullying is now named outright. **Prefer naming a category to gesturing at it.**
 
-  ⚠️ An earlier **over-delivery** audit (`tests/`, with `TEST_PLAN.md` and
+  ⚠️ An earlier **over-delivery** evaluation (`tests/`, with `TEST_PLAN.md` and
   `CODEBOOK.md`) was removed in this repo — different question, run never
   completed. Older commits and docs may still reference it; it is not coming back.
 - `RESEARCH_DATA.md` — schema for the prompt-writing research data captured in the story file.

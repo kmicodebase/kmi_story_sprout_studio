@@ -58,29 +58,29 @@ This repo is also the artifact for a study of **how agency is split between the 
 
 | Paper | Here |
 |---|---|
-| §3.2 — the one-line constraint, printed in full | `UNIVERSAL_IMAGE_RULE` + the tier suffix in [`cloudflare-worker/pip-worker.js`](cloudflare-worker/pip-worker.js); the exact audited string and its sha256 in [`FROZEN.json`](tests/content_safeguard_audit/FROZEN.json) |
+| §3.2 — the one-line constraint, printed in full | `UNIVERSAL_IMAGE_RULE` + the tier suffix in [`cloudflare-worker/pip-worker.js`](cloudflare-worker/pip-worker.js); the exact evaluated string and its sha256 in [`FROZEN.json`](evaluations/content_safeguard/FROZEN.json) |
 | §3.3 — the word filter | `UNIVERSAL_BLOCKED`, same file |
 | §3.3 — personal-information removal | [`pii-filter-test.html`](pii-filter-test.html) — open it, click *Run tests* |
-| §4.1 — description fidelity (scribe contract) | harnesses `scribe_audit*.py`; development suite in [`model_selection_tests/`](model_selection_tests/); the held-out run in [`scribe_audit_v3_heldout_out/`](scribe_audit_v3_heldout_out/) |
-| §4.1 — the freeze gate | [`CLAUDE_CODE_AUDIT_V3_HELDOUT_INSTRUCTIONS.md`](CLAUDE_CODE_AUDIT_V3_HELDOUT_INSTRUCTIONS.md) |
-| §4.2 — the content safeguard | [`tests/content_safeguard_audit/`](tests/content_safeguard_audit/) — start at `FINDINGS.md`; protocol, stimuli, runner, journals and per-image judgments alongside |
+| §4.1 — description fidelity (scribe contract) | harnesses `evaluations/scribe_contract/scribe_eval*.py`; development suite in [`evaluations/scribe_contract/model_selection/`](evaluations/scribe_contract/model_selection/); the held-out run in [`evaluations/scribe_contract/heldout_results/`](evaluations/scribe_contract/heldout_results/) |
+| §4.1 — the freeze gate | [`evaluations/scribe_contract/HELDOUT_PROTOCOL.md`](evaluations/scribe_contract/HELDOUT_PROTOCOL.md) |
+| §4.2 — the content safeguard | [`evaluations/content_safeguard/`](evaluations/content_safeguard/) — start at `FINDINGS.md`; protocol, stimuli, runner, journals and per-image judgments alongside |
 
 > ⚠️ **§4.2 in the paper reports round 1 only; this repo reports two rounds.** The
 > numbers therefore differ on purpose — 92.5% keep in the paper against 92.1%
 > pooled here, and round 2 corrected two round-1 claims. `FINDINGS.md` §9–§12
 > covers what changed. See the note below before citing either.
 
-Pip's chat **contract** (the `PIP_SYSTEM` prompt in `pip-worker.js`) and its **model** were chosen by a reproducible audit whose inputs and outputs are committed here, not summarized away:
+Pip's chat **contract** (the `PIP_SYSTEM` prompt in `pip-worker.js`) and its **model** were chosen by a reproducible evaluation whose inputs and outputs are committed here, not summarized away:
 
 | Path | What it is |
 |---|---|
-| `scribe_audit.py`, `scribe_audit_ext.py` | v1 harness (2-turn sequences) and its 200-turn extension |
-| `scribe_audit_v2.py` | development suite — 50 four-turn sequences, used for **model selection** |
-| `scribe_audit_v3_heldout.py` | **held-out verification** harness — 60 all-new sequences, frozen config, `--rescore` mode |
-| `CLAUDE_CODE_AUDIT_V3_HELDOUT_INSTRUCTIONS.md` | the researcher-authored spec that drove the held-out run (freeze gate, one-function rule, packaging) |
-| `model_selection_tests/` | the eight archived selection runs (+ its own `README.md`) |
-| `scribe_audit_v3_heldout_out/` | the verification run — 3 reps × {original, re-scored, pass-1} + `run_config.json` + `PROTOCOL.md` |
-| `tests/content_safeguard_audit/` | **content-safeguard audit** — does the one-line constraint appended to every image request keep legitimate children's content while blocking what crosses the line? Two complete rounds, 480 trials. Start at its `FINDINGS.md`. |
+| `evaluations/scribe_contract/scribe_eval.py`, `evaluations/scribe_contract/scribe_eval_ext.py` | v1 harness (2-turn sequences) and its 200-turn extension |
+| `evaluations/scribe_contract/scribe_eval_v2.py` | development suite — 50 four-turn sequences, used for **model selection** |
+| `evaluations/scribe_contract/scribe_eval_v3_heldout.py` | **held-out verification** harness — 60 all-new sequences, frozen config, `--rescore` mode |
+| `evaluations/scribe_contract/HELDOUT_PROTOCOL.md` | the researcher-authored spec that drove the held-out run (freeze gate, one-function rule, packaging) |
+| `evaluations/scribe_contract/model_selection/` | the eight archived selection runs (+ its own `README.md`) |
+| `evaluations/scribe_contract/heldout_results/` | the verification run — 3 reps × {original, re-scored, pass-1} + `run_config.json` + `PROTOCOL.md` |
+| `evaluations/content_safeguard/` | **content-safeguard evaluation** — does the one-line constraint appended to every image request keep legitimate children's content while blocking what crosses the line? Two complete rounds, 480 trials. Start at its `FINDINGS.md`. |
 
 **Frozen final numbers** — held-out suite, `gpt-5.4-mini` at `reasoning_effort: low`, against the frozen contract (`PIP_SYSTEM` sha256 `d01f624b…`), 60 unseen four-turn sequences × 3 stochastic reps:
 
@@ -94,14 +94,14 @@ Pip's chat **contract** (the `PIP_SYSTEM` prompt in `pip-worker.js`) and its **m
 The deterministic scorer flags *candidates*; flagged lines are adjudicated on the paper side. After the run, two ruler bugs were fixed and **everything re-scored deterministically from the stored transcripts** — no new model calls. Reproduce that pass offline:
 
 ```bash
-python3 scribe_audit_v3_heldout.py --rescore
+python3 evaluations/scribe_contract/scribe_eval_v3_heldout.py --rescore
 ```
 
-> The audit **selected** `gpt-5.4-mini`; the public demo currently still runs the previous chat model pending a redeploy of the Worker.
+> The evaluation **selected** `gpt-5.4-mini`; the public demo currently still runs the previous chat model pending a redeploy of the Worker.
 
-### The content-safeguard audit
+### The content-safeguard evaluation
 
-A second, separate study — [`tests/content_safeguard_audit/`](tests/content_safeguard_audit/) — asks whether the one-line constraint the Worker appends to **every** image request holds. Not whether it blocks: whether it blocks the right things *and leaves the rest alone*. Scary, sad and mildly gross content is normal in children's storytelling, and a safeguard that quietly sands it off has failed just as surely as one that lets a knife through.
+A second, separate study — [`evaluations/content_safeguard/`](evaluations/content_safeguard/) — asks whether the one-line constraint the Worker appends to **every** image request holds. Not whether it blocks: whether it blocks the right things *and leaves the rest alone*. Scary, sad and mildly gross content is normal in children's storytelling, and a safeguard that quietly sands it off has failed just as surely as one that lets a knife through.
 
 Eighty scripted descriptions in child voice, sent straight to the deployed image model. No children involved. Two rounds, **480 trials**, $15.11. Every image judged by eye — an image model can accept a request and quietly deliver a softened scene, so API responses cannot score this.
 
@@ -189,10 +189,9 @@ Class folder/
 | `sprout-sync.js` | Shared crypto + content-addressing + relay client (used by **both** pages) |
 | `sprout-sync-test.html` | Test harness for the above — open it and click *Run tests* |
 | `cloudflare-worker/pip-worker.js` | **OpenAI proxy** for Pip **and** the sync relay. Also holds `PIP_SYSTEM`, the source of truth for Pip's behaviour |
-| `PIP_SCOPE.md` | Phase 1 design record. Historical; superseded by `PIP_SYSTEM` |
 | `RESEARCH_DATA.md` | Codebook for the local story-file schema (`childWords` vs. the composed prompt; v6) |
 | `scripts/images-to-json.py` | Convert a folder of images into a story JSON |
-| `tests/content_safeguard_audit/` | Content-safeguard audit: `FINDINGS.md`, `PROTOCOL.md`, `FROZEN.json`, stimuli, runner, and both rounds' results |
+| `evaluations/content_safeguard/` | Content-safeguard evaluation: `FINDINGS.md`, `PROTOCOL.md`, `FROZEN.json`, stimuli, runner, and both rounds' results |
 | `CLAUDE.md` | Guidance for AI coding assistants working in this repo |
 
 ## 🚀 Getting started

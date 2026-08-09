@@ -2949,7 +2949,8 @@ let pipSeeded = false;
 let pipBusy = false;
 const pipMessages = [];   // OpenAI-format history: {role:'user'|'assistant', content}
 const PIP_GREETING = "Hi, I'm Pip, your virtual illustrator. Tell me what you want me to draw, and I'll make a picture for your story. After I draw it, you can tell me what to keep or change.";
-// Post-image reflection check (PIP_SCOPE.md §3) — rotated for variety.
+// Post-image reflection check — rotated for variety. These four strings and
+// PIP_GREETING above are the wording the paper quotes; keep them verbatim.
 const PIP_IMAGE_CHECKS = [
   "Is this the picture you imagined?",
   "Does this match what you pictured?",

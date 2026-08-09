@@ -3,7 +3,7 @@
 These are the exploratory runs that led to the choice of chat model and reasoning
 effort for Pip. They are **development / selection** artifacts, kept for the record.
 The **verification** numbers reported in the paper come from the held-out suite in
-`../scribe_audit_v3_heldout_out/`, whose cases share nothing with these runs.
+`../evaluations/scribe_contract/heldout_results/`, whose cases share nothing with these runs.
 
 Every run here was executed **locally, direct to OpenAI**, with the worker's exact
 request parameters (the Cloudflare relay itself was not in the path — see each
@@ -18,11 +18,11 @@ auto-scored screen; flagged lines are for hand adjudication, not final verdicts.
 
 ## Suites
 
-- **`scribe_audit.py`** — v1 exploratory. 22 two-turn scribe sequences (44 draw
+- **`evaluations/scribe_contract/scribe_eval.py`** — v1 exploratory. 22 two-turn scribe sequences (44 draw
   turns) + a small rules set. Used to compare models and effort levels quickly.
-- **`scribe_audit_ext.py`** — v1 extended to 100 sequences (200 draw turns); S23–S100
+- **`evaluations/scribe_contract/scribe_eval_ext.py`** — v1 extended to 100 sequences (200 draw turns); S23–S100
   authored by Claude to raise n (noted in that run's `run_config.json`).
-- **`scribe_audit_v2.py`** — the development suite proper: 50 **four-turn** additive
+- **`evaluations/scribe_contract/scribe_eval_v2.py`** — the development suite proper: 50 **four-turn** additive
   sequences (accumulation stress + a replacement subset) + 28 rule cases, run on
   both the selected model and its predecessor.
 

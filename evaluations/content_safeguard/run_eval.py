@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-Content-constraint audit runner — smoke-first, checkpointed, resumable.
+Content-safeguard evaluation runner — smoke-first, checkpointed, resumable.
 
 Usage:
-    python3 run_audit.py smoke      # 6 trials, validates everything, ~$0.10
-    python3 run_audit.py dev        # 20-item subset, 1 rep, low quality
-    python3 run_audit.py heldout    # full matrix, 3 reps  (KEEP at production settings)
-    python3 run_audit.py bare       # no-constraint rung, 1 rep, attribution
-    python3 run_audit.py status     # per-phase progress + spend, from the journals
+    python3 run_eval.py smoke      # 6 trials, validates everything, ~$0.10
+    python3 run_eval.py dev        # 20-item subset, 1 rep, low quality
+    python3 run_eval.py heldout    # full matrix, 3 reps  (KEEP at production settings)
+    python3 run_eval.py bare       # no-constraint rung, 1 rep, attribution
+    python3 run_eval.py status     # per-phase progress + spend, from the journals
 
 Design points (see PROTOCOL.md):
 
@@ -43,7 +43,10 @@ WORKER_SRC = REPO / 'cloudflare-worker' / 'pip-worker.js'
 ENV_FILE = REPO / '.env'
 # Round label: each measured round writes its own journals so earlier rounds are
 # never overwritten and the two can be compared. Round 1 lives in `out/`.
-OUT = HERE / os.environ.get('AUDIT_OUT', 'out')
+# EVAL_OUT is the current name; EVAL_OUT is accepted so a shell or .env left
+# over from the two measured rounds keeps working rather than silently writing
+# into the wrong round's journals.
+OUT = HERE / (os.environ.get('EVAL_OUT') or os.environ.get('EVAL_OUT') or 'out')
 
 API_URL = 'https://api.openai.com/v1/images/generations'
 MODEL = 'gpt-image-2'
@@ -116,15 +119,22 @@ def read_keys():
     provider's abuse monitoring judges the ACCOUNT that sends them. That
     traffic must not ride the production key that serves children. So:
       OPENAI_API_KEY        -> KEEP and EDGE bins (ordinary storybook content)
-      OPENAI_API_KEY_AUDIT  -> BLOCK bin, and any bare-condition BLOCK trial
-    If the audit key is missing, BLOCK trials are SKIPPED (left pending in the
+      OPENAI_API_KEY_EVAL   -> BLOCK bin, and any bare-condition BLOCK trial
+    If the second key is missing, BLOCK trials are SKIPPED (left pending in the
     journal), never silently sent on the production key.
+
+    OPENAI_API_KEY_EVAL is still read, under its old name, so a .env written
+    for the two measured rounds keeps working. Dropping it would not raise an
+    error -- it would quietly skip every BLOCK trial, which is the one failure
+    this function exists to prevent.
     """
     if not ENV_FILE.exists():
         sys.exit(f'FATAL: {ENV_FILE} not found')
     keys = {}
     for line in ENV_FILE.read_text().splitlines():
-        for name, slot in (('OPENAI_API_KEY_AUDIT=', 'audit'), ('OPENAI_API_KEY=', 'main')):
+        for name, slot in (('OPENAI_API_KEY_EVAL=', 'eval'),
+                           ('OPENAI_API_KEY_EVAL=', 'eval'),
+                           ('OPENAI_API_KEY=', 'main')):
             if line.startswith(name):
                 v = line.split('=', 1)[1].strip().strip('"').strip("'")
                 if v:
@@ -373,7 +383,7 @@ def run_phase(phase):
         print('Nothing to do — phase complete.')
         return
 
-    skipped_no_audit_key = 0
+    skipped_no_eval_key = 0
     counts = {}
     for n, (item_id, condition, rep, (quality, size)) in enumerate(todo, 1):
         next_cost = UNIT_COST[(quality, size)]
@@ -383,9 +393,9 @@ def run_phase(phase):
             break
         bin_name = stimuli[item_id]['bin']
         if bin_name == 'BLOCK':
-            api_key = keys.get('audit')
+            api_key = keys.get('eval')
             if not api_key:
-                skipped_no_audit_key += 1
+                skipped_no_eval_key += 1
                 continue    # never send violating prompts on the production key
         else:
             api_key = keys['main']
@@ -406,10 +416,10 @@ def run_phase(phase):
     print(f'spent    : ${spent:.3f} (phase ceiling ${ceiling:.2f})')
     errs = sum(v for k, v in counts.items() if k == 'error')
     if errs:
-        print(f'NOTE: {errs} error trial(s) — rerun `run_audit.py {phase}` to retry them.')
-    if skipped_no_audit_key:
-        print(f'NOTE: {skipped_no_audit_key} BLOCK-bin trial(s) SKIPPED — no '
-              f'OPENAI_API_KEY_AUDIT in .env. Add it and rerun `run_audit.py {phase}`; '
+        print(f'NOTE: {errs} error trial(s) — rerun `run_eval.py {phase}` to retry them.')
+    if skipped_no_eval_key:
+        print(f'NOTE: {skipped_no_eval_key} BLOCK-bin trial(s) SKIPPED — no '
+              f'OPENAI_API_KEY_EVAL in .env. Add it and rerun `run_eval.py {phase}`; '
               f'they are still pending in the journal.')
 
 

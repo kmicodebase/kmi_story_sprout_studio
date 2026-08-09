@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Extended contract audit — 100 scribe sequences (200 draw turns) instead of 22 (44).
+Extended contract evaluation — 100 scribe sequences (200 draw turns) instead of 22 (44).
 
-WHY A SEPARATE FILE: the audit instructions say do not modify the sequences or the
-scoring logic. So scribe_audit.py is left byte-identical and imported. This file only
+WHY A SEPARATE FILE: the evaluation instructions say do not modify the sequences or the
+scoring logic. So evaluations/scribe_contract/scribe_eval.py is left byte-identical and imported. This file only
 APPENDS sequences to the module's SCRIBE list, then calls the untouched main(). The
 scorer, the STOP list, the flag definitions and the original 22 sequences are the
 researcher's, unedited — S01..S22 are still scored exactly as before, so the 44-turn
@@ -21,11 +21,11 @@ rules were followed when seeding, both learned from artifacts in the original se
     (S10's "comet's" flags as an omission when the model writes "comet with a tail")
   - never seed a word that is in the harness's STOP list
 
-RUN: set -a; source .env; set +a; python3 scribe_audit_ext.py
+RUN: set -a; source .env; set +a; python3 evaluations/scribe_contract/scribe_eval_ext.py
 """
 import sys, pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-import scribe_audit as sa
+import scribe_eval as sa
 
 EXTRA = [
  ("S23", ["a fluffy bunny with a pink ribon hopping in a medow",

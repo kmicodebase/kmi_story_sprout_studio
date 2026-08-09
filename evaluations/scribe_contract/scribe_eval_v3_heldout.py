@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Story Sprout contract audit v3 - HELD-OUT VERIFICATION SUITE.
+Story Sprout contract evaluation v3 - HELD-OUT VERIFICATION SUITE.
 Authored 2026-07-23, AFTER model selection, on the paper side. All-new cases;
 same case-type distribution as the development suite (including a ~10%
 replacement subset - excluding the known-hard category would be reverse-tuning).
 Runs the FROZEN final configuration only, REPS times (stochastic honesty).
-The development suite (scribe_audit_v2.py) is hereafter the model-selection
-audit; this suite supplies the reported verification numbers.
+The development suite (evaluations/scribe_contract/scribe_eval_v2.py) is hereafter the model-selection
+evaluation; this suite supplies the reported verification numbers.
 DO NOT MODIFY SEQUENCES OR SCORING. Claude Code implements call_model only.
 """
 import json, re, sys, time, hashlib, pathlib
@@ -299,8 +299,8 @@ def content(s): return {t for t in toks(s) if t not in STOP and len(t) > 2}
 import os, atexit, urllib.request, urllib.error
 
 OPENAI_URL = "https://api.openai.com/v1/chat/completions"
-WORKER_JS = pathlib.Path(__file__).resolve().parent / "cloudflare-worker" / "pip-worker.js"
-OUT_ROOT = pathlib.Path("scribe_audit_v3_heldout_out")
+WORKER_JS = pathlib.Path(__file__).resolve().parents[2] / "cloudflare-worker" / "pip-worker.js"
+OUT_ROOT = pathlib.Path("evaluations/scribe_contract/heldout_results")
 
 def _load_contract():
     src = WORKER_JS.read_text()
@@ -454,7 +454,7 @@ RULES: judgment {S['ask_ok']}/{S['ask_n']} | bare {S['cap_ok']}/{S['cap_n']} | r
 """
 
 def main():
-    outroot = pathlib.Path("scribe_audit_v3_heldout_out"); outroot.mkdir(exist_ok=True)
+    outroot = pathlib.Path("evaluations/scribe_contract/heldout_results"); outroot.mkdir(exist_ok=True)
     pooled = []
     for rep in range(1, REPS + 1):
         S, log, tx = audit_once(rep)
@@ -470,8 +470,8 @@ def main():
 # and write summary_rescored.txt + audit_log_rescored.jsonl beside — never over — the
 # originals. Both scorings are released; run_config.json carries the erratum.
 def rescore():
-    outroot = pathlib.Path("scribe_audit_v3_heldout_out")
-    if not outroot.exists(): sys.exit("no transcripts to re-score; run the audit first")
+    outroot = pathlib.Path("evaluations/scribe_contract/heldout_results")
+    if not outroot.exists(): sys.exit("no transcripts to re-score; run the evaluation first")
     pooled = []
     for rep in range(1, REPS + 1):
         d = outroot / f"run{rep}"

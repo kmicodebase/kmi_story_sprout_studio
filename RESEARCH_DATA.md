@@ -94,7 +94,7 @@ Uncapped, because each entry is small (no image). Two kinds of record share the 
 **The `childWords` ↔ `imagePrompt` split is the heart of the record.** It is what lets a reader
 verify, per attempt, that the child's words and the composed prompt are saved as *separate strings*
 — the trace the paper's Table 1 depends on — and measure how far one departs from the other. (The
-held-out audit under `scribe_audit_v3_heldout_out/` is exactly that measurement, run adversarially.)
+held-out evaluation under `evaluations/scribe_contract/heldout_results/` is exactly that measurement, run adversarially.)
 
 ### 2. A safety-block event
 

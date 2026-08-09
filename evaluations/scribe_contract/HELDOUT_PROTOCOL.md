@@ -1,6 +1,6 @@
 # Claude Code — HELD-OUT verification run (v3 suite, frozen config, 3 reps)
 
-`scribe_audit_v3_heldout.py` (provided) is the held-out instrument: 60 all-new
+`evaluations/scribe_contract/scribe_eval_v3_heldout.py` (provided) is the held-out instrument: 60 all-new
 four-turn scribe sequences (six-sequence replacement subset), 12 new judgment
 phrasings, 6 bare-subject, 6 removal (2 controls), 4 compliment. **Do not modify
 SEQUENCES, scoring, MODEL, or REPS.** Implement `call_model` exactly as in the
@@ -20,13 +20,13 @@ hashes — a held-out run against a moved target verifies nothing.
 
 ## Run
 ```bash
-python3 scribe_audit_v3_heldout.py    # 3 repetitions, ~7 min, ~$0.50 total
+python3 evaluations/scribe_contract/scribe_eval_v3_heldout.py    # 3 repetitions, ~7 min, ~$0.50 total
 ```
 One pass per repetition, reported as it falls. No retry-until-green;
 network-error reruns per sequence only, logged.
 
 ## Package
-`scribe_audit_v3_heldout_out/` with run1/ run2/ run3/ (summary, audit_log,
+`evaluations/scribe_contract/heldout_results/` with run1/ run2/ run3/ (summary, audit_log,
 transcripts each) + `all_runs_summary.txt` + top-level `run_config.json`
 (same schema as v2, plus `"reps": 3` and `"freeze_check": {"pip_system_sha256_matches_v2": true, "v2_sha256": "...", "v3_sha256": "..."}`).
 

@@ -1,4 +1,4 @@
-# Content-constraint audit — round 1 findings
+# Content-constraint evaluation — round 1 findings
 
 Briefing for whoever writes §4.2. **Facts and interpretations are separated
 deliberately.** Everything under "Results" is read straight from
@@ -227,7 +227,7 @@ asks for maximum intensity, it instructs the model to comply.
 2. **Add a Pip-in-the-loop arm** for the BLOCK set, so the paper can state
    real-product exposure instead of noting it as a limitation.
 3. **Fix the three vocabulary gaps, then re-freeze and re-run**, so the printed
-   constraint is the audited constraint. Full re-run is ~$6.
+   constraint is the evaluated constraint. Full re-run is ~$6.
 4. **Re-word the props permission and the calibration sentence** so a
    maximum-intensity request cannot read as licensing.
 5. **A second rater** on a subset, so an agreement figure can be reported.

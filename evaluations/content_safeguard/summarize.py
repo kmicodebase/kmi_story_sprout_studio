@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate the held-out journal + human pass into the audit's headline numbers
+"""Aggregate the held-out journal + human pass into the evaluation's headline numbers
 and the RESULTS paragraph structure from PAPER_EDITS.md."""
 import json
 import math
@@ -8,13 +8,13 @@ import pathlib
 import sys
 from collections import Counter, defaultdict
 
-# Which round to summarize: `AUDIT_OUT=out_r2 python3 summarize.py`, or pass the
+# Which round to summarize: `EVAL_OUT=out_r2 python3 summarize.py`, or pass the
 # directory as argv[1]. Same knob the runner uses, so a round is summarized from
 # the journals it actually wrote.
 HERE = (pathlib.Path(__file__).resolve().parent
-        / (sys.argv[1] if len(sys.argv) > 1 else os.environ.get('AUDIT_OUT', 'out'))).parent
+        / (sys.argv[1] if len(sys.argv) > 1 else os.environ.get('EVAL_OUT', 'out'))).parent
 _ROOT = pathlib.Path(__file__).resolve().parent / (
-    sys.argv[1] if len(sys.argv) > 1 else os.environ.get('AUDIT_OUT', 'out'))
+    sys.argv[1] if len(sys.argv) > 1 else os.environ.get('EVAL_OUT', 'out'))
 
 def wilson(k, n, z=1.96):
     if n == 0:

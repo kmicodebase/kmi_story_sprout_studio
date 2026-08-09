@@ -1,4 +1,4 @@
-# Content-constraint audit
+# Content-constraint evaluation
 
 Does the one-line constraint the platform appends to every image request (§3.2
 of the paper) keep the scary, sad, and mildly gross content children legitimately
@@ -30,9 +30,9 @@ also laundering, so it must itself name every category it relies on.
 | `FINDINGS.md` | **The briefing.** Method, every number, interpretations kept separate from facts. Round 2 section supersedes two round-1 claims — read to the end. |
 | `PROTOCOL.md` | Pre-registered design, frozen-constraint rule, invalidation conditions |
 | `PAPER_EDITS.md` | Drop-in text for the paper: §3.2 fix, §3.3 clause, §4.2 with results |
-| `FROZEN.json` | The exact audited constraint string + sha256 |
+| `FROZEN.json` | The exact evaluated constraint string + sha256 |
 | `stimuli/*.jsonl` | The three fixed stimulus sets, 80 descriptions |
-| `run_audit.py` | The runner (checkpointed, resumable, spend-capped) |
+| `run_eval.py` | The runner (checkpointed, resumable, spend-capped) |
 | `summarize.py` | Per-round rates with Wilson intervals |
 | `compare_rounds.py` | Round-over-round diff + the bare-vs-constrained analysis |
 | `out/`, `out_r2/` | Round 1 and round 2 journals, contact sheets, per-image judgments, cited evidence images |
@@ -42,16 +42,16 @@ Contact sheets, journals, and individually cited evidence images are committed.
 
 ## Reproducing
 
-Needs `OPENAI_API_KEY` and `OPENAI_API_KEY_AUDIT` in the repo `.env`. **Two keys
+Needs `OPENAI_API_KEY` and `OPENAI_API_KEY_EVAL` in the repo `.env`. **Two keys
 on purpose:** the BLOCK set fires violating prompts at the safety stack, and that
-traffic must not ride the account that serves children. Without the audit key,
+traffic must not ride the account that serves children. Without the evaluation key,
 BLOCK trials are skipped rather than silently sent on the production key.
 
 ```bash
-AUDIT_OUT=out_r3 python3 run_audit.py smoke     # 6 trials, validates everything
-AUDIT_OUT=out_r3 python3 run_audit.py heldout   # 240 trials, ~2h
-AUDIT_OUT=out_r3 python3 run_audit.py bare      # 240 trials, attribution arm
-AUDIT_OUT=out_r3 python3 run_audit.py status    # progress + spend
+EVAL_OUT=out_r3 python3 run_eval.py smoke     # 6 trials, validates everything
+EVAL_OUT=out_r3 python3 run_eval.py heldout   # 240 trials, ~2h
+EVAL_OUT=out_r3 python3 run_eval.py bare      # 240 trials, attribution arm
+EVAL_OUT=out_r3 python3 run_eval.py status    # progress + spend
 python3 summarize.py out_r3
 ```
 
