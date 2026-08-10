@@ -272,3 +272,43 @@ Two things deliberately kept the older word, so do not treat them as misses:
 not evaluations; and `audit_log.jsonl` inside committed run outputs keeps its
 name because renaming a data file already written by a completed run rewrites
 the record of that run.
+
+## A8 — the deployed constraint changed on 2026-08-09, after both rounds
+
+This supersedes A2, and changes what A3–A5 can claim.
+
+The constraint in the Worker is no longer the one either round evaluated:
+
+| | sha256 |
+|---|---|
+| evaluated, rounds 1 and 2 (`FROZEN.json`) | `a976dedd…` |
+| deployed now | `05042478…` |
+
+Three changes: the bullying sentence removed, "undress" dropped from the nudity
+clause, and the moderate tier's age band moved from eight-to-ten to
+**seven-to-nine**.
+
+**The age band is a genuine improvement for the paper.** §5 sets the target band
+at 7–9 and the deployed prompt now says the same thing; it previously said
+eight-to-ten, which no reviewer could reconcile with §5. One knock-on: the tier
+is still labelled "Grades 3 – 5" in the teacher UI, which is roughly ages 8–11.
+The label and the prompt now name different bands — pick one.
+
+**The bullying removal cuts the other way.** §4.2's block-set result was measured
+with that sentence present, and the sentence exists because the evaluation found
+the failure it names. Reporting 82.7% for a constraint that no longer contains
+it overstates what ships.
+
+So §3.2 and §4.2 can no longer both be true of the same string. Options:
+
+1. **Re-run** the keep and block sets under the new constraint and report those
+   numbers. Cleanest, ~$9.51 and ~2h per round, `EVAL_OUT=out_r3`.
+2. **Restore the bullying sentence** — then A2 stands as written, both rounds
+   remain valid, and only the age band needs noting in §3.2.
+3. **Report the old numbers and disclose the change** — state that §4.2 measured
+   the constraint at `a976dedd…` and that the deployed string has since changed,
+   with the diff. Honest, cheap, and weaker: the audited artifact is not the
+   shipped one.
+
+Option 2 is the only one that leaves the paper's §4.2 describing the deployed
+system without new spend.

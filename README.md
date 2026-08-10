@@ -58,12 +58,18 @@ This repo is also the artifact for a study of **how agency is split between the 
 
 | Paper | Here |
 |---|---|
-| §3.2 — the one-line constraint, printed in full | `UNIVERSAL_IMAGE_RULE` + the tier suffix in [`cloudflare-worker/pip-worker.js`](cloudflare-worker/pip-worker.js); the exact evaluated string and its sha256 in [`FROZEN.json`](evaluations/content_safeguard/FROZEN.json) |
+| §3.2 — the one-line constraint, printed in full | **deployed:** `UNIVERSAL_IMAGE_RULE` + the tier suffix in [`cloudflare-worker/pip-worker.js`](cloudflare-worker/pip-worker.js). **Evaluated:** [`FROZEN.json`](evaluations/content_safeguard/FROZEN.json). ⚠️ These diverged on 2026-08-09 — see below |
 | §3.3 — the word filter | `UNIVERSAL_BLOCKED`, same file |
 | §3.3 — personal-information removal | [`pii-filter-test.html`](pii-filter-test.html) — open it, click *Run tests* |
 | §4.1 — description fidelity (scribe contract) | harnesses `evaluations/scribe_contract/scribe_eval*.py`; development suite in [`evaluations/scribe_contract/model_selection/`](evaluations/scribe_contract/model_selection/); the held-out run in [`evaluations/scribe_contract/heldout_results/`](evaluations/scribe_contract/heldout_results/) |
 | §4.1 — the freeze gate | [`evaluations/scribe_contract/HELDOUT_PROTOCOL.md`](evaluations/scribe_contract/HELDOUT_PROTOCOL.md) |
 | §4.2 — the content safeguard | [`evaluations/content_safeguard/`](evaluations/content_safeguard/) — start at `FINDINGS.md`; protocol, stimuli, runner, journals and per-image judgments alongside |
+
+> ⚠️ **The deployed constraint changed on 2026-08-09 and no longer matches the
+> one §4.2 evaluated** (`05042478…` vs `a976dedd…`). The sentence naming bullying
+> was removed, along with "undress"; the age band moved to seven-to-nine, which
+> now agrees with the paper's §5. `evaluations/content_safeguard/README.md` has
+> the diff and what it costs to re-measure.
 
 > ⚠️ **§4.2 in the paper reports round 1 only; this repo reports two rounds.** The
 > numbers therefore differ on purpose — 92.5% keep in the paper against 92.1%
