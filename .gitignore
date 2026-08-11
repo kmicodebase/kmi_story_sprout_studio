@@ -28,8 +28,12 @@ eval-*/
 # The paper PDF stays OUT of this public repo by default. Posting an
 # under-review manuscript is a decision about venue policy and preprint rights,
 # not a housekeeping one -- delete this rule deliberately if you want it public.
-Latest_version.pdf
-latest_version.pdf
+*.pdf
+
+# Hand-offs from co-authors: the patch and its covering note are transport, not
+# repository content. Their contents land as commits; the carriers do not.
+JACK_START_HERE.md
+*.patch
 
 # ── Per-machine tool state ───────────────────────────────────────────────────
 # CLAUDE.md itself IS tracked -- it is the architecture doc, and it carries the

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Aggregate the held-out journal + human pass into the evaluation's headline numbers
-and the RESULTS paragraph structure from PAPER_EDITS.md."""
+and the RESULTS paragraph structure used in the paper's 4.2."""
 import json
 import math
 import os
