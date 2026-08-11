@@ -432,7 +432,7 @@ async function handleChat(body, env, tier) {
    reaches /image through Pip — it does NOT cover text posted to /image
    directly, which is what the sentence was the backstop for.
    ─────────────────────────────────────────────────────────────────────────── */
-const UNIVERSAL_IMAGE_RULE = " This is an illustration for a children's storybook. Do not add anything frightening, violent, gory, or adult that the description did not explicitly ask for — match the intensity of the description and never exceed it. Absolutely no nudity, or sexual content; no blood, wounds, gore, injury or death; no real firearms or military hardware; nothing hateful or cruel.";
+const UNIVERSAL_IMAGE_RULE = " This is an illustration for a children's storybook. Do not add anything frightening, violent, gory, or adult that the description did not explicitly ask for — match the intensity of the description and never exceed it. Absolutely no nudity or sexual content; no blood, wounds, gore, injury or death; no real firearms or military hardware; nothing hateful or cruel.";
 
 const safeStyleFor = (tier) => UNIVERSAL_IMAGE_RULE + tier.imageSuffix;
 
