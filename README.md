@@ -98,7 +98,7 @@ The deterministic scorer flags *candidates*; flagged lines are adjudicated on th
 python3 evaluations/scribe_contract/scribe_eval_v3_heldout.py --rescore
 ```
 
-> The evaluation **selected** `gpt-5.4-mini`; the public demo currently still runs the previous chat model pending a redeploy of the Worker.
+> The evaluation **selected** `gpt-5.4-mini`, and it is what `CHAT_MODEL` in the Worker ships. Because the Worker deploys by dashboard paste, "what the repo says" and "what is live" can diverge — the repo is the source of truth, and a paste is what closes the gap.
 
 ### The content-safeguard evaluation
 
