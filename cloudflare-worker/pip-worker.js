@@ -166,11 +166,29 @@ const ALLOWED_SIZE = ['1024x1024', '1024x1536', '1536x1024', 'auto'];
 // edit can loosen one level without noticing it is editing shared text.
 const UNIVERSAL_RULES = `- THESE HOLD AT EVERY LEVEL, no matter what the child asks or how they phrase it: no sexual, romantic-adult, or suggestive content; no nudity, undress, or revealing clothing; no blood, wounds, gore, injury, corpses or death; no real guns, rifles, pistols, bombs, grenades, missiles or military hardware, in ANY style, including toy, water, Nerf and cartoon versions; no hateful, cruel, or demeaning depictions of any person or group; no self-harm, suicide, drugs, alcohol, smoking or vaping; no real, identifiable living people; no horror imagery and nothing photorealistically frightening.`;
 
+/* ⚠ `grades` is what the teacher picks from; `imageSuffix` names an age band to
+   the model. THE TWO MUST DESCRIBE THE SAME CHILDREN. They drifted once: the
+   moderate suffix moved to seven-to-nine (matching the paper's target band,
+   §5) while its label still read "Grades 3 – 5", so a teacher choosing a band
+   for 8–11-year-olds got a prompt written for 7–9-year-olds.
+
+   Resolved by moving the labels, not the suffixes — the moderate suffix is the
+   string the paper prints and `FROZEN.json` hashes, and every measured round
+   ran against it. Editing it invalidates that chain; editing a label does not.
+
+   Ladder: K–1 restrictive, 2–5 moderate, 6 permissive. Contiguous, and nothing
+   at the top of a band got a looser tier than before. Grade 2 did move down a
+   tier, which is deliberate: the paper prints the moderate safeguard as the one
+   appropriate for seven-year-olds.
+
+   Duplicated as TIER_UI in teacher.html for display. Only the `id`s are
+   load-bearing — the Worker validates against this copy — so a drifted label
+   there is cosmetic, but fix both anyway. */
 const CONTENT_TIERS = {
   restrictive: {
     id: 'restrictive',
     label: 'Restrictive',
-    grades: 'Kindergarten – Grade 2',
+    grades: 'Kindergarten – Grade 1',
     blurb: 'Warm and calm. No weapons at all, nothing spooky, nobody in danger.',
     pipRules: `${UNIVERSAL_RULES}
 - Keep everything gentle, warm and safe — these pictures are for the youngest children. Nothing scary, tense or sad: no danger, no peril, nobody in trouble, nobody frightened, no fighting or arguing.
@@ -190,7 +208,7 @@ const CONTENT_TIERS = {
   moderate: {
     id: 'moderate',
     label: 'Moderate',
-    grades: 'Grades 3 – 5',
+    grades: 'Grades 2 – 5',
     blurb: 'Classic storybook adventure. Swords and shields as props, mild peril, gentle monsters.',
     pipRules: `${UNIVERSAL_RULES}
 - Keep everything at the level of a classic children's storybook. Mild adventure and mild peril are fine — a dragon to outwit, a dark wood to cross — but it must read as exciting, never distressing. Nobody is ever shown hurt, bleeding, crying in fear, or in real danger.

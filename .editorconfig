@@ -1,0 +1,42 @@
+# Most editors read this natively; VS Code needs the EditorConfig extension.
+#
+# The point here is narrow: this repository has no build step, no linter and no
+# formatter config, and two of its files are cited artifacts of a paper. An
+# editor that reformats on save rewrites them wholesale — which happened, and
+# buried a real one-line change in alignment churn.
+
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{js,html,css,json,py,md}]
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_size = 4
+
+[*.md]
+# Two trailing spaces is a hard line break in Markdown.
+trim_trailing_whitespace = false
+
+# Columns in these are aligned by hand and carry meaning — the tier table, the
+# CORS allowlist, the constant block. Leave them alone.
+[cloudflare-worker/pip-worker.js]
+trim_trailing_whitespace = true
+
+# Vendored. Never reformat, never lint.
+[vendor/**]
+indent_style = unset
+indent_size = unset
+insert_final_newline = unset
+trim_trailing_whitespace = unset
+
+# Committed run records. Rewriting these edits evidence.
+[evaluations/**/{journal,human_pass,raw_exchanges,audit_log}*.jsonl]
+insert_final_newline = unset
+trim_trailing_whitespace = unset
