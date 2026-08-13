@@ -24,8 +24,8 @@ Reproduce from the released journals, no model calls:
 python3 summarize.py out_r3
 ```
 
-**`FINDINGS.md` §13–§16 is round 3** — method and stimulus design are in §1–§12,
-which cover the two earlier rounds. Read **§14 before citing the block rate**: the
+**`FINDINGS.md` §13–§16 is round 3**; §1–§12 are the two earlier rounds and carry
+the method and stimulus design. Read **§14 before citing the block rate** — the
 4-point drop is a single stimulus, and the reason is not what it looks like.
 
 ### Rounds 1 and 2 — the development record
@@ -64,7 +64,7 @@ generates 3/3. Our word filter never matched it in any round.
 
 So the safeguard is not failing to block; it is *overriding* a refusal the
 provider makes on its own. The storybook framing vouches for the description and
-the provider believes it. `FINDINGS.md` §14 has the full history and §16 the
+the provider believes it. `FINDINGS.md` §14 has the full history and §15 the
 consequence: a safeguard that vouches must name every category it relies on,
 because for anything it leaves unnamed it is not neutral. Zero of 40 keep items
 and zero of 15 edge items moved between rounds 2 and 3, so drift does not
@@ -93,7 +93,7 @@ from the manuscript for length and is intended for future work, not omitted.
 
 | Path | What |
 |---|---|
-| `FINDINGS.md` | **The briefing.** Method, every number, interpretations kept separate from facts. §1–§12 are rounds 1–2; **§13–§16 are round 3, the round the paper reports**, and §16 supersedes the §12 headline. |
+| `FINDINGS.md` | **The briefing.** Method, every number, interpretations kept separate from facts. §1–§12 are rounds 1–2; **§13–§16 are round 3, the round the paper reports.** |
 | `PROTOCOL.md` | Pre-registered design, frozen-constraint rule, invalidation conditions |
 | `FROZEN.json` | The shipped safeguard, its sha256, **and** the sha of the string round 3 actually ran (they differ by punctuation — the file explains why that cannot have moved a result), plus the word-filter sha |
 | `stimuli/*.jsonl` | The three fixed stimulus sets, 80 descriptions |
