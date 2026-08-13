@@ -69,7 +69,8 @@ This repo is also the artifact for a study of **how agency is split between the 
 > rounds 1–2 evaluated an earlier revision of the safeguard, so their numbers
 > differ (92.1% / 82.7% against round 3's 91.7% / 78.7%). That is scope, not
 > disagreement — `evaluations/content_safeguard/README.md` explains which is
-> which, and note that `FINDINGS.md` predates round 3.
+> which; `FINDINGS.md` §13–§16 covers round 3, and §14 is the one to read before
+> citing the block rate.
 
 Pip's chat **contract** (the `PIP_SYSTEM` prompt in `pip-worker.js`) and its **model** were chosen by a reproducible evaluation whose inputs and outputs are committed here, not summarized away:
 
