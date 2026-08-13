@@ -3,7 +3,7 @@
 These are the exploratory runs that led to the choice of chat model and reasoning
 effort for Pip. They are **development / selection** artifacts, kept for the record.
 The **verification** numbers reported in the paper come from the held-out suite in
-`../evaluations/scribe_contract/heldout_results/`, whose cases share nothing with these runs.
+`../heldout_results/`, whose cases share nothing with these runs.
 
 Every run here was executed **locally, direct to OpenAI**, with the worker's exact
 request parameters (the Cloudflare relay itself was not in the path — see each
