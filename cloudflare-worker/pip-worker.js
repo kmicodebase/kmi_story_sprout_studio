@@ -318,6 +318,11 @@ const PII_REDACTIONS = [
   /\bmy\s+school('s)?\s+(is|name|is\s+called)\b[^.!?\n]*/ig,
   /\bmy\s+(phone|cell|mobile)\b[^.!?\n]*/ig,
   /\bmy\s+e-?mail\b[^.!?\n]*/ig,
+  // Birthday. The client has blocked this since the filter was written; this
+  // backstop did not, so it was the one category a stale or bypassed client could
+  // still carry through to OpenAI. "Stay in step with the client's" means all of
+  // them — count the two lists when you touch either.
+  /\bmy\s+birthday\s*(is\b|:)[^.!?\n]*/ig,
 ];
 
 function redactPersonalInfo(text) {
@@ -1126,8 +1131,29 @@ async function handleSync(path, request, env) {
         if (body.byteLength > MAX_BLOB_BYTES) throw httpError(413, 'That image is too large.');
 
         await store.put(key, body);
-        meta.blobCount = (meta.blobCount || 0) + 1;
-        await store.put(metaKey, JSON.stringify(meta), 'application/json');
+
+        // Bumping blobCount is a read-modify-write on the SAME meta.json that
+        // carries the revision counter, so it has to be a compare-and-set for the
+        // same reason the manifest push is one.
+        //
+        // `meta` above was read at the top of this request. A plain put of it here
+        // would write back a stale `rev` — and a blob upload runs concurrently with
+        // manifest pushes by design (two tabs, or a teacher polling while a child
+        // draws). Losing that race silently ROLLED THE REVISION BACK: the relay
+        // would hold the new manifest while meta claimed the old rev, so the
+        // teacher's poll never saw the work land and the next push 409'd against a
+        // revision that no longer existed. Exactly the bug the manifest
+        // compare-and-set fixes, on the path that had been left out of it.
+        //
+        // Re-read, merge only OUR field, put conditionally, retry on a lost race.
+        // The blob itself is already durable and immutable, so a failure here can
+        // only under-count the quota — never lose data.
+        for (let attempt = 0; attempt < 4; attempt++) {
+          const cur = await store.getJsonWithEtag(metaKey);
+          if (!cur) break;                                  // team deleted mid-upload
+          const next = { ...cur.value, blobCount: (cur.value.blobCount || 0) + 1 };
+          if (await store.put(metaKey, JSON.stringify(next), 'application/json', cur.etag)) break;
+        }
         return jsonResponse({ stored: true, existed: false }, 201);
       }
     }

@@ -121,9 +121,17 @@ A class runs at one of three levels, chosen by the teacher from a dropdown on
 
 | id | Label | Grades |
 |---|---|---|
-| `restrictive` | Restrictive | Kindergarten – Grade 2 |
-| `moderate` | Moderate | Grades 3 – 5 |
+| `restrictive` | Restrictive | Kindergarten – Grade 1 |
+| `moderate` | Moderate | Grades 2 – 5 |
 | `permissive` | Permissive | Grade 6 |
+
+⚠️ These bands moved once already (Grade 2 dropped from Restrictive to Moderate,
+because the paper prints the moderate safeguard as the one appropriate for
+seven-year-olds). They are written down in **three** places — `CONTENT_TIERS` in
+the Worker, `TIER_UI` in `teacher.html`, and here — and this table was the one
+left behind. Only the `id`s are load-bearing; a drifted label is cosmetic in the
+Worker but not in the dropdown, where it tells a teacher which children a level
+is for.
 
 The level moves **two** things only: how much peril/menace a picture may carry,
 and whether storybook gear (a sword, a bow) may appear and how. Everything in

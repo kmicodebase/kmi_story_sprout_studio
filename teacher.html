@@ -1120,6 +1120,38 @@
       const needed = new Set();
       for (const t of collected) for (const h of t.blobHashes) needed.add(h);
 
+      /* Snapshots reference images too — that is the whole point of keeping them,
+         and each one is only a few KB precisely BECAUSE it shares images/ rather
+         than inlining them.
+
+         Counting only each team's CURRENT blobHashes therefore marked as orphaned
+         every picture any surviving team had since stopped using, and deleting
+         those quietly broke that team's own history: the snapshot JSON stays on
+         disk, still opens, and now points at files that are gone. The relay side
+         already refuses to delete blobs for exactly this reason ("old snapshots
+         still need them"); the disk side did not.
+
+         Any failure reading them means we do not know what is referenced, and an
+         orphan wastes a few megabytes while a wrong delete is unrecoverable — so
+         bail out rather than guess. */
+      try {
+        const teamsDir = await dir(T.root, 'teams');
+        for await (const [, teamHandle] of teamsDir.entries()) {
+          if (teamHandle.kind !== 'directory') continue;
+          let snapDir;
+          try { snapDir = await teamHandle.getDirectoryHandle('snapshots'); }
+          catch { continue; }                       // no snapshots for this team yet
+          for await (const [fname, fh] of snapDir.entries()) {
+            if (fh.kind !== 'file' || !fname.endsWith('.json')) continue;
+            const manifest = JSON.parse(await (await fh.getFile()).text());
+            for (const h of Object.keys(manifest.blobs || {})) needed.add(h);
+          }
+        }
+      } catch (e) {
+        log('skipped image cleanup — could not read the snapshot history (' + e.message + ')');
+        return 0;
+      }
+
       const imagesDir = await dir(T.root, 'images');
       let removed = 0;
       const doomed = [];
@@ -1149,59 +1181,70 @@
         hideErr('class-err');
       }
 
-      if (!T.teacher.teams.length) {
-        if (!quiet) setCollectStatus('No teams yet — create one first.');
+      // Everything from here runs inside try/finally. `collecting` is the guard
+      // that stops two checks overlapping, and the button is re-enabled at the end
+      // — so ANY throw that escaped this function used to leave the guard stuck on
+      // and the button dead, which silently ended collection for the rest of the
+      // session. And it did not take an exotic failure: writeJson() below throws
+      // if the teacher moved the class folder or the permission lapsed. Per-team
+      // failures are already caught individually; this covers the rest.
+      try {
+        if (!T.teacher.teams.length) {
+          if (!quiet) setCollectStatus('No teams yet — create one first.');
+          return;
+        }
+
+        let changed = 0, empty = 0, failed = 0;
+        for (const team of T.teacher.teams) {
+          try {
+            if (await collectTeam(team)) { changed++; log('collected ' + team.teamName); }
+            else if ((T.klass.teams[team.teamName] || {}).lastRev > 0) { /* already up to date */ }
+            else empty++;
+          } catch (e) {
+            failed++;
+            const rec = T.klass.teams[team.teamName] || (T.klass.teams[team.teamName] = { teamName: team.teamName, lastRev: 0 });
+            rec.status = 'error';
+            rec.error = e.message;
+            log('!! ' + team.teamName + ': ' + e.message);
+          }
+        }
+
+        T.klass.updatedAt = new Date().toISOString();
+        await writeJson(T.root, 'class.json', T.klass);
+        renderTeams();
+        renderTierBar();   // every team just reported its real level — surface any drift
+
+        // Be precise about what "nothing new" means. The teacher can only ever
+        // collect what a student has SENT — and students send a few seconds after
+        // they stop drawing, not the instant they draw. Saying "up to date" when the
+        // truth is "they haven't sent it yet" makes a working system look broken.
+        const bits = [];
+        if (changed) bits.push('Collected new work from ' + changed + ' team' + (changed > 1 ? 's' : ''));
+        if (failed)  bits.push(failed + ' failed');
+        if (!changed && !failed) {
+          bits.push(empty === T.teacher.teams.length
+            ? 'Nothing sent yet — work arrives a few seconds after a student stops drawing'
+            : 'Nothing new since the last check');
+        }
+        const msg = bits.join(' · ');
+
+        // A background check only speaks up when it has something to say. Flashing
+        // "nothing new" every thirty seconds would be noise, and would train the
+        // teacher to ignore the one line that matters.
+        if (!quiet || changed || failed) {
+          setCollectStatus(msg, failed ? 'err' : (changed ? 'ok' : ''));
+          log(msg);
+        }
+      } catch (e) {
+        // Say so. A dashboard that stops collecting without a word is the worst
+        // outcome here — the teacher believes they are holding the class's work.
+        setCollectStatus('Collection failed: ' + e.message, 'err');
+        log('!! collection failed: ' + e.message);
+      } finally {
         btn.disabled = false;
         btn.textContent = 'Collect work now';
         collecting = false;
-        return;
       }
-
-      let changed = 0, empty = 0, failed = 0;
-      for (const team of T.teacher.teams) {
-        try {
-          if (await collectTeam(team)) { changed++; log('collected ' + team.teamName); }
-          else if ((T.klass.teams[team.teamName] || {}).lastRev > 0) { /* already up to date */ }
-          else empty++;
-        } catch (e) {
-          failed++;
-          const rec = T.klass.teams[team.teamName] || (T.klass.teams[team.teamName] = { teamName: team.teamName, lastRev: 0 });
-          rec.status = 'error';
-          rec.error = e.message;
-          log('!! ' + team.teamName + ': ' + e.message);
-        }
-      }
-
-      T.klass.updatedAt = new Date().toISOString();
-      await writeJson(T.root, 'class.json', T.klass);
-      renderTeams();
-      renderTierBar();   // every team just reported its real level — surface any drift
-
-      // Be precise about what "nothing new" means. The teacher can only ever
-      // collect what a student has SENT — and students send a few seconds after
-      // they stop drawing, not the instant they draw. Saying "up to date" when the
-      // truth is "they haven't sent it yet" makes a working system look broken.
-      const bits = [];
-      if (changed) bits.push('Collected new work from ' + changed + ' team' + (changed > 1 ? 's' : ''));
-      if (failed)  bits.push(failed + ' failed');
-      if (!changed && !failed) {
-        bits.push(empty === T.teacher.teams.length
-          ? 'Nothing sent yet — work arrives a few seconds after a student stops drawing'
-          : 'Nothing new since the last check');
-      }
-      const msg = bits.join(' · ');
-
-      // A background check only speaks up when it has something to say. Flashing
-      // "nothing new" every thirty seconds would be noise, and would train the
-      // teacher to ignore the one line that matters.
-      if (!quiet || changed || failed) {
-        setCollectStatus(msg, failed ? 'err' : (changed ? 'ok' : ''));
-        log(msg);
-      }
-
-      btn.disabled = false;
-      btn.textContent = 'Collect work now';
-      collecting = false;
     }
     let collecting = false;
 

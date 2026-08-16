@@ -47,7 +47,7 @@ const PII_PATTERNS = [
   { what: 'your school',         re: /\bmy\s+school('s)?\s+(is|name|is\s+called)\b/i },
   { what: 'your phone number',   re: /\bmy\s+(phone|cell|mobile)\b/i },
   { what: 'your email address',  re: /\bmy\s+e-?mail\b/i },
-  { what: 'your birthday',       re: /\bmy\s+birthday\s+(is|:)/i },
+  { what: 'your birthday',       re: /\bmy\s+birthday\s*(is\b|:)/i },
 ];
 function findPersonalInfo(text) {
   for (const p of PII_PATTERNS) if (p.re.test(text)) return p.what;
@@ -72,6 +72,7 @@ const MUST_BLOCK = [
   "go to www.myschool.com",
   "https://example.com/me",
   "my birthday is June 3rd",
+  "my birthday: 12 May",                  // no space before the colon — used to slip through
 ];
 
 // Ordinary creative work. A false positive here BREAKS THE PRODUCT.
@@ -96,6 +97,9 @@ const MUST_PASS = [
   "add a red collar to the dog",
   "draw me a robot",
   "I want a spooky forest",
+  "a cake for my birthday party",          // a birthday can be the SUBJECT of a picture
+  "my birthday island with palm trees",    // "is" inside "island" must not trip it
+  "my birthday isn't until winter",        // nor the "is" inside "isn't"
 ];
 
 const out = document.getElementById('out');
