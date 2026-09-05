@@ -92,8 +92,10 @@ All app state is in the `S` object:
 
 ### Story format
 
-`buildStoryJson()` produces `{v: 6, title, saved, session, imgMap, storyText, aiHistory, slides[]}`.
-v6 adds `pipConversation` + `promptLog`; v5 files still load. See `RESEARCH_DATA.md`.
+`buildStoryJson()` produces `{v: 7, title, saved, session, page, imgMap, storyText, aiHistory, slides[]}`.
+v7 adds `page` (`{size, orient, w, h}`, see `PAGE_SIZES`); v6 added `pipConversation` +
+`promptLog`; v5 and v6 files still load. A file with no `page` opens at the original 800x540.
+See `RESEARCH_DATA.md`.
 
 Images are **base64 data URLs inlined into every page's Fabric JSON, and duplicated again in `aiHistory[].dataUrl`**. A six-page story is therefore ~50MB. This matters enormously for sync — see below.
 

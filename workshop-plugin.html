@@ -325,6 +325,20 @@ html, body {
   font-size: 12px;
 }
 
+/* Page size menu (top bar) */
+#page-menu { width: 230px; }
+#page-menu .shape-item.active { background: var(--purple-bg); color: var(--purple-dark); }
+.page-note { margin-left: auto; font-size: 10px; font-weight: 600; color: var(--ink3); }
+.page-orient { display: flex; gap: 4px; padding: 2px 2px 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.page-orient-btn {
+  flex: 1; padding: 7px 4px;
+  background: transparent; border: 1.5px solid var(--border2); border-radius: var(--radius-sm);
+  font-family: var(--font); font-size: 11px; font-weight: 700; color: var(--ink2); cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.page-orient-btn:hover { background: var(--purple-bg); }
+.page-orient-btn.active { background: var(--purple); border-color: var(--purple); color: #fff; }
+
 /* ═══════════════════════════════════════════════
    MAIN BODY
 ═══════════════════════════════════════════════ */
@@ -373,7 +387,7 @@ html, body {
 .slide-thumb {
   position: relative;
   width: 100%;
-  aspect-ratio: 4/3;
+  aspect-ratio: var(--page-ratio, 800 / 540);
   border-radius: var(--radius-sm);
   border: 2.5px solid transparent;
   background: var(--cream2);
@@ -442,7 +456,7 @@ html, body {
 
 .slide-add-btn {
   width: 100%;
-  aspect-ratio: 4/3;
+  aspect-ratio: var(--page-ratio, 800 / 540);
   border-radius: var(--radius-sm);
   border: 2px dashed var(--border2);
   background: transparent;
@@ -1058,10 +1072,27 @@ html, body {
 
     <div class="tb-sep"></div>
 
-    <button class="tb-btn tb-btn-icon" id="tb-story-text-btn" title="Toggle story text panel">
-      <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 3h12M2 6.5h12M2 10h8M2 13h10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-      Story Text
-    </button>
+    <!-- Page size + orientation. Applies to the whole story: a book has one page size. -->
+    <div class="rib-dd">
+      <button class="tb-btn tb-btn-icon" id="tb-page-btn" title="Page size and orientation" aria-haspopup="true" aria-expanded="false">
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span id="tb-page-label">Standard</span>
+        <svg class="rib-dd-caret" width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+      <div class="rib-dd-menu menu-list" id="page-menu">
+        <div class="page-orient">
+          <button class="page-orient-btn" data-orient="landscape" title="Wider than tall">
+            <svg width="14" height="11" viewBox="0 0 14 11" fill="none"><rect x="1" y="1" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+            Horizontal
+          </button>
+          <button class="page-orient-btn" data-orient="portrait" title="Taller than wide">
+            <svg width="11" height="14" viewBox="0 0 11 14" fill="none"><rect x="1" y="1" width="9" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+            Vertical
+          </button>
+        </div>
+        <!-- size items are filled in from PAGE_SIZES by wireButtons() -->
+      </div>
+    </div>
 
     <button class="tb-btn tb-btn-primary" id="rib-ai-image" title="Open Pip the illustrator">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 3.5L13 6l-3.5 1.5L8 11l-1.5-3.5L3 6l3.5-1.5L8 1z" fill="currentColor" opacity=".9"/><path d="M13 10l.8 1.7 1.7.8-1.7.8L13 15l-.8-1.7-1.7-.8 1.7-.8L13 10z" fill="currentColor"/></svg>
@@ -1451,8 +1482,24 @@ html, body {
 /* ═══════════════════════════════════════════════
    CONSTANTS
 ═══════════════════════════════════════════════ */
-const CANVAS_W = 800;
-const CANVAS_H = 540;
+/* Page size. The long side is always PAGE_LONG canvas units and the orientation
+   decides which side that is, so every size fits the same zoom math. `standard`
+   is the original 800x540 page: stories saved before page sizes existed carry
+   no `page` field and land here, exactly as they were drawn. */
+const PAGE_LONG = 800;
+const PAGE_SIZES = {
+  standard: { label: 'Standard',     ratio: 800 / 540, note: '800 × 540' },
+  letter:   { label: 'Letter',       ratio: 11 / 8.5,  note: '8½ × 11 in' },
+  a4:       { label: 'A4',           ratio: 297 / 210, note: '210 × 297 mm' },
+  square:   { label: 'Square',       ratio: 1,         note: '1 : 1' },
+  book810:  { label: 'Picture book', ratio: 10 / 8,    note: '8 × 10 in' },
+  book69:   { label: 'Chapter book', ratio: 9 / 6,     note: '6 × 9 in' },
+  photo57:  { label: 'Photo',        ratio: 7 / 5,     note: '5 × 7 in' },
+  screen43: { label: 'Screen',       ratio: 4 / 3,     note: '4 : 3' },
+  wide169:  { label: 'Widescreen',   ratio: 16 / 9,    note: '16 : 9' },
+};
+let CANVAS_W = 800;
+let CANVAS_H = 540;
 const SAVE_KEY  = 'storysketch_v4_';
 const STORY_FILE = 'story.json';
 const SESSION_START = new Date().toISOString();
@@ -1463,6 +1510,8 @@ const SESSION_START = new Date().toISOString();
 const S = {
   slides:       [{ json: null, thumb: null, pid: 'p0' }],
   cur:          0,
+  pageSize:     'standard',      // key into PAGE_SIZES
+  pageOrient:   'landscape',     // 'landscape' | 'portrait'
   history:      [[]],
   redo:         [[]],
 
@@ -1532,10 +1581,6 @@ async function idbSet(key, val) {
    INIT CANVAS
 ═══════════════════════════════════════════════ */
 function initCanvas() {
-  const wrap = document.getElementById('canvas-wrap');
-  wrap.style.width  = CANVAS_W + 'px';
-  wrap.style.height = CANVAS_H + 'px';
-
   S.canvas = new fabric.Canvas('c', {
     width:  CANVAS_W,
     height: CANVAS_H,
@@ -1589,7 +1634,63 @@ function fitCanvas(targetZoom) {
   S.canvas.setZoom(S.zoom);
   S.canvas.setWidth (Math.round(CANVAS_W * S.zoom));
   S.canvas.setHeight(Math.round(CANVAS_H * S.zoom));
+  // The white card behind the page. It used to be fixed at the unzoomed size in
+  // initCanvas(), which only lined up at 100%; it has to follow the page shape now.
+  const wrap = document.getElementById('canvas-wrap');
+  wrap.style.width  = Math.round(CANVAS_W * S.zoom) + 'px';
+  wrap.style.height = Math.round(CANVAS_H * S.zoom) + 'px';
   updateZoomLabel();
+}
+
+/* ── Page size ── */
+function pageDims(sizeId, orient) {
+  const size  = PAGE_SIZES[sizeId] || PAGE_SIZES.standard;
+  const short = Math.round(PAGE_LONG / size.ratio);
+  return orient === 'portrait' ? { w: short, h: PAGE_LONG } : { w: PAGE_LONG, h: short };
+}
+
+// Applies a page size to the whole story. Objects keep their positions; the page
+// grows or shrinks around them. `silent` is for newStory()/loadStoryData(), which
+// re-render everything themselves and must not mark the story dirty.
+async function setPageSize(sizeId, orient, { silent = false } = {}) {
+  if (!PAGE_SIZES[sizeId]) sizeId = 'standard';
+  if (orient !== 'portrait') orient = 'landscape';
+  S.pageSize = sizeId;
+  S.pageOrient = orient;
+  const { w, h } = pageDims(sizeId, orient);
+  CANVAS_W = w;
+  CANVAS_H = h;
+  document.documentElement.style.setProperty('--page-ratio', `${w} / ${h}`);
+  fitCanvas();
+  S.canvas.renderAll();
+  updatePageLabel();
+  if (silent) return;
+  await rethumbAllPages();
+  markDirty();
+}
+
+function updatePageLabel() {
+  document.getElementById('tb-page-label').textContent = PAGE_SIZES[S.pageSize].label;
+  document.querySelectorAll('#page-menu [data-val]').forEach(b =>
+    b.classList.toggle('active', b.dataset.val === S.pageSize));
+  document.querySelectorAll('#page-menu [data-orient]').forEach(b =>
+    b.classList.toggle('active', b.dataset.orient === S.pageOrient));
+}
+
+// The filmstrip thumbnails were rendered at the old page shape. Re-render every
+// page off-screen at the new one so the strip matches what you get when you click.
+async function rethumbAllPages() {
+  for (let i = 0; i < S.slides.length; i++) {
+    const s = S.slides[i];
+    if (i === S.cur) { await saveCurrentSlide(true); continue; }
+    if (!s.json) { s.thumb = null; continue; }
+    const sc = new fabric.StaticCanvas(null, { width: CANVAS_W, height: CANVAS_H });
+    await new Promise(res => sc.loadFromJSON(s.json, () => { sc.renderAll(); res(); }));
+    try { s.thumb = sc.toDataURL({ format: 'jpeg', quality: 0.25, multiplier: 0.18 }); }
+    catch (e) { console.error('[thumbnail] off-screen render failed for page', i + 1, e); }
+    sc.dispose();
+  }
+  renderSlideThumbs();
 }
 
 function updateZoomLabel() {
@@ -2712,6 +2813,7 @@ function newStory() {
   S.fileHandle = null;
   S.imgMap = {};
   S.dirty = false;
+  setPageSize('standard', 'landscape', { silent: true });
   storyTextLines = [];
   renderStoryText();
   aiHistory.length = 0;
@@ -2741,9 +2843,12 @@ async function buildStoryJson() {
     storyTitle,
     suggestedName: storyTitle.replace(/[^a-zA-Z0-9 _-]/g, '').trim() || 'My Story',
     json: JSON.stringify({
-      v:      6,   // v6 adds pipConversation + promptLog. v5 files still load.
+      v:      7,   // v7 adds page. v6 added pipConversation + promptLog. v5 and v6 files still load.
       title:  storyTitle,
       saved:  Date.now(),
+      // w/h are derived from size+orient and written out so a reader that does not
+      // know PAGE_SIZES can still lay the page out. The app itself reads size+orient.
+      page:   { size: S.pageSize, orient: S.pageOrient, w: CANVAS_W, h: CANVAS_H },
       session: { startedAt: SESSION_START, savedAt: new Date().toISOString(), totalSlides: S.slides.length },
       imgMap: S.imgMap,
       storyText: storyTextLines,
@@ -2904,6 +3009,10 @@ async function openStory() {
 async function loadStoryData(d) {
   // Restore global imgMap
   S.imgMap = d.imgMap || {};
+
+  // Page size first, so the slides below load into a canvas of the right shape.
+  const pg = d.page || {};
+  setPageSize(pg.size, pg.orient, { silent: true });
 
   /* Restore story text and the image cache — UNCONDITIONALLY, including when the
      incoming story has none.
@@ -3699,7 +3808,17 @@ function wireButtons() {
   document.getElementById('tb-saveas-btn').onclick  = saveStoryAs;
   document.getElementById('tb-open-btn').onclick    = openStory;
   document.getElementById('tb-export-btn').onclick  = exportCurrentSlide;
-  document.getElementById('tb-story-text-btn').onclick = toggleStoryTextPanel;
+
+  // Page size menu: one row per PAGE_SIZES entry, then the shared dropdown wiring.
+  const pageMenu = document.getElementById('page-menu');
+  pageMenu.insertAdjacentHTML('beforeend', Object.entries(PAGE_SIZES).map(([id, p]) =>
+    `<button class="shape-item" data-val="${id}">${p.label}<span class="page-note">${p.note}</span></button>`
+  ).join(''));
+  setupDropdown('tb-page-btn', 'page-menu', id => setPageSize(id, S.pageOrient));
+  pageMenu.querySelectorAll('[data-orient]').forEach(b => {
+    b.onclick = () => setPageSize(S.pageSize, b.dataset.orient);   // menu stays open
+  });
+  updatePageLabel();
   document.getElementById('story-text-close').onclick = () => {
     document.getElementById('story-text-panel').classList.remove('open');
   };
@@ -3768,11 +3887,6 @@ function wireButtons() {
    STORY TEXT PANEL (Plugin feature)
 ═══════════════════════════════════════════════ */
 let storyTextLines = [];
-
-function toggleStoryTextPanel() {
-  const panel = document.getElementById('story-text-panel');
-  panel.classList.toggle('open');
-}
 
 function setStoryText(text) {
   storyTextLines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);

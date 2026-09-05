@@ -23,16 +23,18 @@ is the point of the record.
 
 ---
 
-## File structure (v6)
+## File structure (v7)
 
-`v6` is the current schema; **`v5` is the legacy, pre-Pip schema** and still loads (see the bottom
-of this document).
+`v7` is the current schema. It differs from `v6` only by the `page` field (page size and
+orientation), which is not research data. **`v5` is the legacy, pre-Pip schema** and still loads
+(see the bottom of this document).
 
 ```json
 {
-  "v": 6,
+  "v": 7,
   "title": "My Cat Story",
   "saved": 1712400000000,
+  "page": { "size": "letter", "orient": "portrait", "w": 618, "h": 800 },
   "session": { "startedAt": "2026-07-14T10:00:00.000Z", "savedAt": "…", "totalSlides": 3 },
   "storyText": ["Line 1", "Line 2", "…"],
 
