@@ -325,8 +325,8 @@ html, body {
   font-size: 12px;
 }
 
-/* Page size menu (top bar) */
-#page-menu { width: 230px; }
+/* Page size menu (ribbon, Page group) */
+#page-menu { width: 230px; left: auto; right: 0; }
 #page-menu .shape-item.active { background: var(--purple-bg); color: var(--purple-dark); }
 .page-note { margin-left: auto; font-size: 10px; font-weight: 600; color: var(--ink3); }
 .page-orient { display: flex; gap: 4px; padding: 2px 2px 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
@@ -1072,28 +1072,6 @@ html, body {
 
     <div class="tb-sep"></div>
 
-    <!-- Page size + orientation. Applies to the whole story: a book has one page size. -->
-    <div class="rib-dd">
-      <button class="tb-btn tb-btn-icon" id="tb-page-btn" title="Page size and orientation" aria-haspopup="true" aria-expanded="false">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
-        <span id="tb-page-label">Standard</span>
-        <svg class="rib-dd-caret" width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      </button>
-      <div class="rib-dd-menu menu-list" id="page-menu">
-        <div class="page-orient">
-          <button class="page-orient-btn" data-orient="landscape" title="Wider than tall">
-            <svg width="14" height="11" viewBox="0 0 14 11" fill="none"><rect x="1" y="1" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
-            Horizontal
-          </button>
-          <button class="page-orient-btn" data-orient="portrait" title="Taller than wide">
-            <svg width="11" height="14" viewBox="0 0 11 14" fill="none"><rect x="1" y="1" width="9" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
-            Vertical
-          </button>
-        </div>
-        <!-- size items are filled in from PAGE_SIZES by wireButtons() -->
-      </div>
-    </div>
-
     <button class="tb-btn tb-btn-primary" id="rib-ai-image" title="Open Pip the illustrator">
       <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1l1.5 3.5L13 6l-3.5 1.5L8 11l-1.5-3.5L3 6l3.5-1.5L8 1z" fill="currentColor" opacity=".9"/><path d="M13 10l.8 1.7 1.7.8-1.7.8L13 15l-.8-1.7-1.7-.8 1.7-.8L13 10z" fill="currentColor"/></svg>
       Pip
@@ -1302,6 +1280,28 @@ html, body {
 
     <div class="rib-group">
       <span class="rib-label">Page</span>
+      <!-- Page size + orientation. Applies to the whole story: a book has one page size. -->
+      <div class="rib-dd">
+        <button class="rib-btn" id="rib-page-btn" title="Page size and orientation" aria-haspopup="true" aria-expanded="false">
+          <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.5" y="1.5" width="11" height="13" rx="1.5" stroke="currentColor" stroke-width="1.4"/><path d="M5 5h6M5 8h6M5 11h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <span id="rib-page-label">Standard</span>
+          <svg class="rib-dd-caret" width="9" height="9" viewBox="0 0 10 10" fill="none"><path d="M2 3.5L5 6.5L8 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="rib-dd-menu menu-list" id="page-menu">
+          <div class="page-orient">
+            <button class="page-orient-btn" data-orient="landscape" title="Wider than tall">
+              <svg width="14" height="11" viewBox="0 0 14 11" fill="none"><rect x="1" y="1" width="12" height="9" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+              Horizontal
+            </button>
+            <button class="page-orient-btn" data-orient="portrait" title="Taller than wide">
+              <svg width="11" height="14" viewBox="0 0 11 14" fill="none"><rect x="1" y="1" width="9" height="12" rx="1.5" stroke="currentColor" stroke-width="1.5"/></svg>
+              Vertical
+            </button>
+          </div>
+          <!-- size items are filled in from PAGE_SIZES by wireButtons() -->
+        </div>
+      </div>
+
       <label class="rib-btn" id="rib-bg-btn" title="Change the page background color" style="position:relative;cursor:pointer">
         <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" stroke-width="1.4"/><path d="M2.5 10.5l3-3 2.5 2.5L11 6.5l2.5 3.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/><circle cx="6" cy="5.5" r="1" fill="currentColor"/></svg>
         Background Color
@@ -1670,7 +1670,7 @@ async function setPageSize(sizeId, orient, { silent = false } = {}) {
 }
 
 function updatePageLabel() {
-  document.getElementById('tb-page-label').textContent = PAGE_SIZES[S.pageSize].label;
+  document.getElementById('rib-page-label').textContent = PAGE_SIZES[S.pageSize].label;
   document.querySelectorAll('#page-menu [data-val]').forEach(b =>
     b.classList.toggle('active', b.dataset.val === S.pageSize));
   document.querySelectorAll('#page-menu [data-orient]').forEach(b =>
@@ -3814,7 +3814,7 @@ function wireButtons() {
   pageMenu.insertAdjacentHTML('beforeend', Object.entries(PAGE_SIZES).map(([id, p]) =>
     `<button class="shape-item" data-val="${id}">${p.label}<span class="page-note">${p.note}</span></button>`
   ).join(''));
-  setupDropdown('tb-page-btn', 'page-menu', id => setPageSize(id, S.pageOrient));
+  setupDropdown('rib-page-btn', 'page-menu', id => setPageSize(id, S.pageOrient));
   pageMenu.querySelectorAll('[data-orient]').forEach(b => {
     b.onclick = () => setPageSize(S.pageSize, b.dataset.orient);   // menu stays open
   });
