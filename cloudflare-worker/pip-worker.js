@@ -698,9 +698,19 @@ function makeStore(env) {
     },
     // Same as getJson, but also returns the object's etag — needed to condition
     // a later put() on nothing having changed since this read.
+    //
+    // ⚠ `etag`, NOT `httpEtag`. httpEtag is the quoted form for response
+    // headers, and workerd REJECTS a quoted value in R2Conditional.etagMatches:
+    //   TypeError: Conditional ETag should not be wrapped in quotes ("…").
+    // (src/workerd/api/r2-bucket.c++, UnwrappedConditional.) With httpEtag here,
+    // every conditional put threw, so every manifest push, every image upload
+    // and every /sync/policy write returned 500 on real R2 — the student saw
+    // "Will retry" forever and the teacher never received anything. The
+    // in-memory bucket the harness uses did not enforce this, which is how it
+    // shipped. Only a Headers-form onlyIf (If-Match) takes the quoted form.
     async getJsonWithEtag(key) {
       const o = await bucket.get(key);
-      return o ? { value: await o.json(), etag: o.httpEtag } : null;
+      return o ? { value: await o.json(), etag: o.etag } : null;
     },
     async head(key) {
       const o = await bucket.head(key);

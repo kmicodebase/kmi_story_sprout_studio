@@ -118,7 +118,7 @@ Because stories are ~50MB, images are **content-addressed**: hashed, uploaded on
 
 ### Content levels (teacher-set)
 
-A class runs at one of three levels, chosen by the teacher from a dropdown on
+A class runs at one of three levels, chosen by the teacher from a three-button picker on
 `teacher.html`. Defined in `CONTENT_TIERS` in the Worker:
 
 | id | Label | Grades |
@@ -132,12 +132,12 @@ because the paper prints the moderate safeguard as the one appropriate for
 seven-year-olds). They are written down in **three** places — `CONTENT_TIERS` in
 the Worker, `TIER_UI` in `teacher.html`, and here — and this table was the one
 left behind. Only the `id`s are load-bearing; a drifted label is cosmetic in the
-Worker but not in the dropdown, where it tells a teacher which children a level
+Worker but not in the picker, where it tells a teacher which children a level
 is for.
 
 The level moves **two** things only: how much peril/menace a picture may carry,
 and whether storybook gear (a sword, a bow) may appear and how. Everything in
-`UNIVERSAL_RULES` / `UNIVERSAL_BLOCKED` is fixed at every level and the dropdown
+`UNIVERSAL_RULES` / `UNIVERSAL_BLOCKED` is fixed at every level and the picker
 cannot reach it — adult content, gore, real firearms, hate, self-harm.
 
 ⚠️ **Students must never be able to change this, and the design is what

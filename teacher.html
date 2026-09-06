@@ -669,7 +669,6 @@
       background: #c94a4a;
     }
 
-    select,
     input[type=number] {
       font-family: var(--font);
       font-size: 13px;
@@ -679,38 +678,86 @@
       background: var(--white);
     }
 
-    /* Content level — class-wide, teacher-only. */
+    /* Content level — class-wide, teacher-only.
+
+       Three plain buttons, not a <select>. The native dropdown opened and shut
+       on a click and only stayed open under a held mouse button, because the
+       board re-renders itself on a timer and re-setting the select's value
+       while its popup is open collapses it. Buttons have no popup to collapse,
+       and they can show the grade band and the blurb without a second widget. */
     .level-bar {
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      flex-wrap: wrap;
       margin-top: 16px;
-      padding: 13px 15px;
+      padding: 14px 16px 15px;
       background: var(--purple-bg);
       border: 2px solid var(--border);
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius);
     }
-    .level-bar label {
-      display: block;
+    .level-head {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .level-head .level-title {
       font-weight: 800;
       font-size: 13.5px;
       color: var(--ink);
     }
-    .level-bar .level-blurb {
-      margin: 3px 0 0;
-      font-size: 12px;
-      color: var(--ink2);
-      max-width: 52ch;
-    }
-    .level-bar select:disabled { opacity: .55; }
     .level-status {
       font-size: 12px;
       color: var(--ink3);
-      min-width: 8ch;
+      margin-left: auto;
     }
     .level-status.ok  { color: var(--green); font-weight: 700; }
     .level-status.err { color: var(--red);   font-weight: 700; }
+    .level-seg {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+    .level-opt {
+      background: var(--white);
+      color: var(--ink2);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      line-height: 1.3;
+    }
+    .level-opt:hover:not(:disabled) {
+      background: var(--white);
+      border-color: var(--purple-light);
+    }
+    .level-opt b {
+      font-size: 13.5px;
+      font-weight: 800;
+      color: var(--ink);
+    }
+    .level-opt small {
+      font-size: 11.5px;
+      font-weight: 600;
+      color: var(--ink3);
+    }
+    .level-opt[aria-checked="true"] {
+      border-color: var(--purple);
+      background: var(--white);
+      box-shadow: 0 0 0 2px var(--purple-bg), 0 0 0 4px var(--purple-light);
+    }
+    .level-opt[aria-checked="true"] b { color: var(--purple-dark); }
+    .level-opt:disabled { opacity: .55; cursor: default; }
+    .level-blurb {
+      margin: 10px 0 0;
+      font-size: 12px;
+      color: var(--ink2);
+      line-height: 1.6;
+    }
+    @media (max-width: 640px) {
+      .level-seg { grid-template-columns: 1fr; }
+    }
 
     #log {
       font-size: 11.5px;
@@ -835,13 +882,12 @@
            from the team's own record, so nothing a child does in the Studio
            can loosen it. -->
       <div class="level-bar">
-        <div>
-          <label for="content-tier">Picture content level</label>
-          <p class="level-blurb" id="level-blurb">—</p>
+        <div class="level-head">
+          <span class="level-title" id="level-title">Picture content level</span>
+          <span class="level-status" id="level-status"></span>
         </div>
-        <div class="spacer"></div>
-        <select id="content-tier" disabled></select>
-        <span class="level-status" id="level-status"></span>
+        <div class="level-seg" id="content-tier" role="radiogroup" aria-labelledby="level-title"></div>
+        <p class="level-blurb" id="level-blurb">—</p>
       </div>
 
       <div class="new-team hide" id="new-team-card">
@@ -1431,39 +1477,49 @@
       });
     }
 
+    // Buttons are built once; every later call only moves the highlight. Nothing
+    // here is a popup, so the periodic re-render that collapsed the old <select>
+    // mid-click cannot interrupt a teacher who is about to choose.
+    let tierBusy = false;
     function renderTierBar() {
-      const sel = $('content-tier');
-      if (!sel.options.length) {
+      const seg = $('content-tier');
+      if (!seg.children.length) {
         for (const t of TIER_UI) {
-          const o = document.createElement('option');
-          o.value = t.id;
-          o.textContent = t.label + ' — ' + t.grades;
-          sel.appendChild(o);
+          const b = document.createElement('button');
+          b.type = 'button';
+          b.className = 'level-opt';
+          b.dataset.tier = t.id;
+          b.setAttribute('role', 'radio');
+          b.innerHTML = '<b>' + esc(t.label) + '</b><small>' + esc(t.grades) + '</small>';
+          b.onclick = () => onTierChange(t.id);
+          seg.appendChild(b);
         }
       }
       const cur = currentTier();
-      sel.value = cur;
-      sel.disabled = !T.teacher;
+      for (const b of seg.children) {
+        b.setAttribute('aria-checked', String(b.dataset.tier === cur));
+        b.disabled = !T.teacher || tierBusy;
+      }
       $('level-blurb').textContent = TIER_UI.find(t => t.id === cur).blurb;
 
       const drift = tierDrift();
       if (drift.length) {
-        setLevelStatus(drift.length + ' team(s) not on this level — re-pick to apply', 'err');
+        setLevelStatus(drift.length + ' team(s) not on this level — pick it again to apply', 'err');
       }
     }
 
     async function applyTier(tier) {
-      const sel = $('content-tier');
       const teams = T.teacher?.teams || [];
 
       T.teacher.settings = T.teacher.settings || {};
       T.teacher.settings.contentTier = tier;
       await writeJson(T.root, 'teacher.json', T.teacher);
-      $('level-blurb').textContent = TIER_UI.find(t => t.id === tier).blurb;
+      renderTierBar();
 
-      if (!teams.length) { setLevelStatus('saved', 'ok'); return; }
+      if (!teams.length) { setLevelStatus('saved — applies to teams you create', 'ok'); return; }
 
-      sel.disabled = true;
+      tierBusy = true;
+      renderTierBar();
       setLevelStatus('applying…');
       let ok = 0;
       const failed = [];
@@ -1483,7 +1539,8 @@
           failed.push(team.teamName + ' (' + e.message + ')');
         }
       }
-      sel.disabled = false;
+      tierBusy = false;
+      renderTierBar();
       await writeJson(T.root, 'class.json', T.klass);
 
       if (failed.length) {
@@ -1499,12 +1556,14 @@
       }
     }
 
-    async function onTierChange() {
+    async function onTierChange(tier) {
+      if (tierBusy || !T.teacher) return;
       hideErr('class-err');
-      const tier = $('content-tier').value;
       if (!TIER_UI.some(t => t.id === tier)) return;
+      // Re-picking the current level is how a teacher re-applies it to a team
+      // that drifted (see tierDrift), so it is not short-circuited here.
       try { await applyTier(tier); }
-      catch (e) { setLevelStatus('failed', 'err'); showErr('class-err', e.message); }
+      catch (e) { tierBusy = false; renderTierBar(); setLevelStatus('failed', 'err'); showErr('class-err', e.message); }
     }
 
     async function newTeam() {
@@ -1742,7 +1801,6 @@
     $('pick-folder').onclick = pickFolder;
     $('switch-signin').onclick = switchSignIn;
     $('new-team').onclick = newTeam;
-    $('content-tier').onchange = onTierChange;
     $('del-cancel').onclick = closeDelete;
     $('del-go').onclick = doDelete;
     $('lightbox').onclick = () => $('lightbox').classList.remove('open');
