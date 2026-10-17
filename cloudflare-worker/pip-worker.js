@@ -58,7 +58,8 @@
 //                            team's own secret code, which never reaches us.)
 //
 // Printed books — see the PRINTED BOOKS block:
-//   RESEND_API_KEY, PRINT_ORDER_EMAIL, PRINT_FROM_EMAIL?, PRINT_LIMIT_OVERRIDES?,
+//   RESEND_API_KEY, PRINT_ORDER_EMAIL? (default kmi.aistorybooks@gmail.com),
+//   PRINT_FROM_EMAIL?, PRINT_LIMIT_OVERRIDES?,
 //   CONTACT_EMAIL? (shown to teachers who want more books)
 //
 // Deploy: Cloudflare Dashboard → Workers & Pages → your worker → Edit code → Paste → Deploy
@@ -1396,7 +1397,8 @@ async function handleSync(path, request, env) {
 
    Worker settings:
      RESEND_API_KEY        secret. Email goes out through Resend's HTTP API.
-     PRINT_ORDER_EMAIL     where orders go.
+     PRINT_ORDER_EMAIL     optional. Where orders go. Defaults to
+                           DEFAULT_ORDER_EMAIL below.
      PRINT_FROM_EMAIL      optional sender. Defaults to Resend's shared test
                            sender, which only delivers to the Resend account's
                            own address; anything else needs a verified domain.
@@ -1418,6 +1420,8 @@ const PRINT_RAISED_LIMIT = 6;
 const PRINT_SCHOOL_LIMIT = 10;
 const MAX_PDF_BASE64     = 30 * 1024 * 1024;   // Resend caps a whole email at 40MB
 const DEFAULT_FROM       = 'StorySprout <onboarding@resend.dev>';
+const DEFAULT_ORDER_EMAIL = 'kmi.aistorybooks@gmail.com';
+const orderEmail = (env) => env.PRINT_ORDER_EMAIL || DEFAULT_ORDER_EMAIL;
 
 function printOverrideFor(email, env) {
   for (const pair of String(env.PRINT_LIMIT_OVERRIDES || '').split(',')) {
@@ -1456,7 +1460,7 @@ function printAllowance(tRec, sRec, who, env) {
     remaining: Math.min(teacherLeft, schoolLeft),
     canRaise: limit < PRINT_RAISED_LIMIT && !tRec?.raised && teacherLeft === 0 && schoolLeft > 0,
     raised: !!tRec?.raised,
-    contact: env.CONTACT_EMAIL || env.PRINT_ORDER_EMAIL || null,
+    contact: env.CONTACT_EMAIL || orderEmail(env),
   };
 }
 
@@ -1526,7 +1530,7 @@ async function sendOrderEmail(env, { orderId, who, order, pdfBase64, allowance, 
     headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       from: env.PRINT_FROM_EMAIL || DEFAULT_FROM,
-      to: [env.PRINT_ORDER_EMAIL],
+      to: [orderEmail(env)],
       reply_to: who.email,
       subject: `Print order: ${order.copies} × "${order.title}" for ${who.email}`,
       text,
@@ -1583,7 +1587,7 @@ async function handlePrint(path, request, env) {
     }
 
     if (path === '/print/order') {
-      if (!env.RESEND_API_KEY || !env.PRINT_ORDER_EMAIL) {
+      if (!env.RESEND_API_KEY) {
         throw httpError(503, 'Printing is not set up on the server yet.');
       }
 
