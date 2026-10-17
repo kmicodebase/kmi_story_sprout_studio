@@ -13,16 +13,31 @@
 //                      Returns: { image } (data URL), or { blocked: true }
 //
 //   Teacher Mode sync (zero-knowledge relay — see the big block comment below):
-//   POST /sync/register     — teacher only (Google ID token). Creates a team.
-//   POST /sync/delete       — teacher only. Erases a team and everything in it.
+//   POST /sync/register     — teacher only (Google ID token). Creates a team, owned by them.
+//   POST /sync/policy       — the team's own teacher only. Sets its content level.
+//   POST /sync/delete       — the team's own teacher only. Erases it and everything in it.
 //   GET  /sync/state        — cheap poll: { rev, updatedAt, serverTime }
 //   GET  /sync/manifest     — download the encrypted story
 //   PUT  /sync/manifest     — upload it (compare-and-set on X-Base-Rev; 409 on conflict)
 //   POST /sync/blobs/check  — { ids[] } -> { missing[] }, so a push is 1–2 requests
 //   GET  /sync/blob/<id>    — download an encrypted image
 //   PUT  /sync/blob/<id>    — upload one (idempotent)
+//   POST /sync/pages/check  — { ids[] } -> { missing[] }, same as blobs, for pages
+//   GET  /sync/page/<id>    — download one encrypted page
+//   PUT  /sync/page/<id>    — upload one (idempotent)
 //   GET  /sync/assign       — the teacher's assignment (student reads)
 //   PUT  /sync/assign       — set it (teacher writes)
+//
+//   Printed books (see the PRINTED BOOKS block). All teacher only:
+//   POST /print/quota       — { school, zip } -> the teacher's and the school's allowance
+//   POST /print/raise       — { school, zip, reason } -> raises 3 to 6, once
+//   POST /print/order       — emails the operator the PDF, address and class details
+//
+//   Usage notice (see the USAGE NOTICE block):
+//   GET  /notice            — the notice text
+//   POST /notice/ack        — { survey } from a student's computer; never show this range again
+//   POST /notice/teams      — teacher: { authTokens[] } -> the notice, if any class is owed it
+//   POST /notice/teams/ack  — teacher: { authTokens[], survey }
 //
 // Environment secret required:
 //   OPENAI_API_KEY — your OpenAI API key (set as an encrypted secret)
@@ -32,12 +47,19 @@
 //
 // Teacher sign-in — configure EITHER or BOTH (both is recommended: the passphrase
 // means a broken OAuth config can't lock a teacher out mid-lesson):
-//   GOOGLE_CLIENT_ID       — plain var; the OAuth Web client ID from Google Cloud
-//   ALLOWED_TEACHER_EMAILS — plain var; comma-separated allowlist of teacher emails
-//   TEACHER_PASSPHRASE     — SECRET. The fallback. Make it long and random —
-//                            anyone holding it can create teams on your relay.
+//   GOOGLE_CLIENT_ID       — plain var; the OAuth Web client ID from Google Cloud.
+//                            Any verified Google account can sign in as a teacher.
+//   ALLOWED_TEACHER_EMAILS — plain var, optional. NOT a sign-in allowlist any more:
+//                            only who may claim a team created before teams had
+//                            owners. See authorizeTeam().
+//   TEACHER_PASSPHRASE     — SECRET. The fallback, and the operator's key: it can
+//                            act on ANY team. Make it long and random.
 //                            (It cannot read any student's work: that needs the
 //                            team's own secret code, which never reaches us.)
+//
+// Printed books — see the PRINTED BOOKS block:
+//   RESEND_API_KEY, PRINT_ORDER_EMAIL, PRINT_FROM_EMAIL?, PRINT_LIMIT_OVERRIDES?,
+//   CONTACT_EMAIL? (shown to teachers who want more books)
 //
 // Deploy: Cloudflare Dashboard → Workers & Pages → your worker → Edit code → Paste → Deploy
 //
@@ -83,8 +105,8 @@ function corsHeaders(origin) {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
     // X-Team-Auth / X-Base-Rev are the sync routes. Auth rides in a HEADER, not
     // the URL — URLs land in Cloudflare's request logs and analytics; headers don't.
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Team-Auth, X-Base-Rev',
-    'Access-Control-Expose-Headers': 'X-Rev, X-Updated-At',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Team-Auth, X-Base-Rev, X-Pages',
+    'Access-Control-Expose-Headers': 'X-Rev, X-Updated-At, X-Usage-Notice',
     'Vary': 'Origin',
   };
 }
@@ -404,7 +426,10 @@ async function handleChat(body, env, tier) {
 
   if (!res.ok) {
     const errText = await res.text();
-    return jsonResponse({ error: `OpenAI chat error: ${res.status} ${errText.slice(0, 300)}` }, res.status);
+    return jsonResponse({
+      error: `OpenAI chat error: ${res.status} ${errText.slice(0, 300)}`,
+      out_of_credit: isOutOfCredit(errText),
+    }, res.status);
   }
 
   // Defensive parse — never trust the shape. Coerce every field; never throw.
@@ -556,7 +581,17 @@ function imageErrorResponse(status, errText) {
   if (status === 400 && /safety|moderation|content[_ ]?policy|not allowed|rejected/i.test(errText)) {
     return jsonResponse({ blocked: true });
   }
-  return jsonResponse({ error: `OpenAI image error: ${status} ${errText.slice(0, 300)}` }, status);
+  return jsonResponse({
+    error: `OpenAI image error: ${status} ${errText.slice(0, 300)}`,
+    out_of_credit: isOutOfCredit(errText),
+  }, status);
+}
+
+// The OpenAI account has run out of money. Flagged separately so the page can
+// tell the class to fetch a teacher, instead of inviting endless retries that
+// cannot succeed until someone tops the account up.
+function isOutOfCredit(errText) {
+  return /insufficient_quota|credit_balance_exhausted/.test(errText);
 }
 
 async function handleImage(body, env, tier) {
@@ -652,6 +687,9 @@ async function handleImageEdit(body, env, tier) {
                                      overwrite by anyone who guessed a code.
      t/<objectKey>/assign            encrypted. Teacher writes, student reads.
      t/<objectKey>/b/<blobId>        encrypted images. Immutable, content-addressed.
+     t/<objectKey>/p/<pageId>        encrypted pages. Immutable, content-addressed.
+     t/<objectKey>/pages.json        plaintext: which page ids are in use, and since
+                                     when the others have not been. See retirePages.
 
    The discipline that makes concurrent access safe without any locking:
      UPLOAD BLOBS FIRST. PUBLISH THE MANIFEST LAST.
@@ -665,6 +703,35 @@ const MAX_BLOB_BYTES     = 8 * 1024 * 1024;   // gpt-image PNGs run 2–3MB; hea
 const MAX_MANIFEST_BYTES = 4 * 1024 * 1024;   // real manifests are ~15KB
 const MAX_BLOBS_PER_TEAM = 500;
 const KEEP_REVISIONS     = 30;
+const MAX_PAGE_BYTES     = 2 * 1024 * 1024;   // a page without its images: Fabric JSON + a thumbnail
+const MAX_PAGES          = 400;
+const PAGE_GRACE_MS      = 24 * 60 * 60 * 1000;
+
+/* Pages are not counted against MAX_BLOBS_PER_TEAM. Images are added a few
+   times a lesson; a page gets a new id on nearly every edit, so a count would
+   lock a busy team out within days. Instead each manifest push says which page
+   ids it uses (X-Pages), and a page no push has used for PAGE_GRACE_MS is
+   deleted. The grace is what keeps this safe: a teacher who read the previous
+   manifest a moment ago can still fetch every page it names, and so can the
+   revision history for a day.
+
+   If a page that IS still used gets deleted anyway (two pushes interleaving
+   their pages.json writes), the next push's /sync/pages/check reports it
+   missing and the student uploads it again. */
+async function retirePages(store, objectKey, liveIds, now) {
+  const key = `t/${objectKey}/pages.json`;
+  const cur = (await store.getJson(key)) || { live: [], retired: {} };
+  const live = new Set(liveIds);
+  const retired = { ...cur.retired };
+  for (const id of cur.live) if (!live.has(id) && !retired[id]) retired[id] = now;
+  for (const id of live) delete retired[id];
+  for (const [id, at] of Object.entries(retired)) {
+    if (now - at < PAGE_GRACE_MS) continue;
+    await store.delete(`t/${objectKey}/p/${id}`);
+    delete retired[id];
+  }
+  await store.put(key, JSON.stringify({ live: [...live], retired }), 'application/json');
+}
 
 // ── Storage adapter ─────────────────────────────────────────────────────────
 // Swap THIS OBJECT to change backends; nothing else touches env.SPROUT_BUCKET.
@@ -831,12 +898,26 @@ function constantTimeEqual(a, b) {
   return diff === 0;
 }
 
-// Returns the verified teacher identity, or throws.
+// Returns the verified teacher { id, email, admin }, or throws.
 //
 // TWO ways in, deliberately. Google is the primary. The passphrase is the
 // fallback so a broken OAuth config or an expired token can't lock a teacher out
 // of their own class in the middle of a lesson — and so the whole feature works
 // for anyone who'd rather not put Google in the middle of children's work.
+//
+// ANY verified Google account is a teacher. There used to be a per-email
+// allowlist, and every new teacher meant someone editing Google Cloud and the
+// Worker by hand. Open sign-up is safe only because of two things elsewhere:
+//   - a team is bound to the teacher who created it (meta.owner), so a student
+//     signing in with their own school Google account cannot touch their
+//     class's level or delete it, even though they know the team token;
+//   - every print order is emailed to a human who places it by hand.
+//
+// `id` is a hash of Google's opaque account id (`sub`), never the email, so
+// the plaintext meta.json still holds nothing that names a person.
+//
+// The passphrase holder is the operator, not a teacher: it is one shared
+// secret in the Worker's own settings, so it gets admin, which acts on any team.
 async function verifyTeacher(request, env) {
   const auth = request.headers.get('Authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
@@ -848,7 +929,7 @@ async function verifyTeacher(request, env) {
     if (!constantTimeEqual(token.slice(5), env.TEACHER_PASSPHRASE)) {
       throw httpError(401, 'That teacher passphrase is not correct.');
     }
-    return 'teacher@passphrase';
+    return { id: 'admin', email: null, admin: true };
   }
 
   // ── Primary: Google ID token ─────────────────────────────────────────────
@@ -879,14 +960,43 @@ async function verifyTeacher(request, env) {
   if (claims.aud !== env.GOOGLE_CLIENT_ID) throw httpError(401, 'Token was not issued for this app.');
   if (!/^(https:\/\/)?accounts\.google\.com$/.test(claims.iss || '')) throw httpError(401, 'Bad token issuer.');
   if (!claims.email || claims.email_verified !== true) throw httpError(401, 'Unverified Google account.');
+  if (!claims.sub) throw httpError(401, 'Sign-in token has no account id.');
 
-  // One teacher, one allowlist. Deliberately not a user table.
-  const allowed = String(env.ALLOWED_TEACHER_EMAILS || '')
-    .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
-  if (!allowed.includes(claims.email.toLowerCase())) {
-    throw httpError(403, 'This Google account is not authorized to create classes.');
+  return {
+    id: await sha256Hex('storysprout-owner|' + claims.sub),
+    email: claims.email.toLowerCase(),
+    admin: false,
+  };
+}
+
+// Comma-separated emails from a Worker variable, lowercased.
+function emailList(value) {
+  return String(value || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+
+// May this teacher act on this team? Reads meta.json and, for a team made
+// before ownership existed, hands it to the first allowed teacher who asks.
+//
+// Ownerless teams were all created when only ALLOWED_TEACHER_EMAILS could sign
+// in, so that list (kept for exactly this) decides who may claim one. Without
+// it, the first student to sign in with a school Google account could claim
+// their class's team and loosen its content level.
+async function authorizeTeam(store, objectKey, who, env) {
+  const metaKey = `t/${objectKey}/meta.json`;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const cur = await store.getJsonWithEtag(metaKey);
+    if (!cur) throw httpError(403, 'That team does not exist.');
+    if (who.admin || cur.value.owner === who.id) return cur;
+    if (cur.value.owner) throw httpError(403, 'That team belongs to a different teacher.');
+    if (!who.email || !emailList(env.ALLOWED_TEACHER_EMAILS).includes(who.email)) {
+      throw httpError(403, 'That team was created before teacher accounts. Ask StorySprout to move it to your account.');
+    }
+    const next = { ...cur.value, owner: who.id };
+    if (await store.put(metaKey, JSON.stringify(next), 'application/json', cur.etag)) {
+      return store.getJsonWithEtag(metaKey);
+    }
   }
-  return claims.email.toLowerCase();
+  throw httpError(409, 'That team was busy syncing — try again in a moment.');
 }
 
 function httpError(status, message) {
@@ -913,16 +1023,19 @@ async function handleSync(path, request, env) {
       if (isRegisterRateLimited(ip)) {
         throw httpError(429, 'Too many attempts. Wait a minute and try again.');
       }
-      // Verified, then deliberately discarded — we check WHO you are, and keep nothing
-      // about it. The identity is used to authorise the call and for nothing else.
-      await verifyTeacher(request, env);
+      // The only thing kept about the teacher is verifyTeacher's opaque `id`,
+      // recorded as the team's owner — see authorizeTeam.
+      const who = await verifyTeacher(request, env);
 
       const { authToken, tier } = await request.json();
       const objectKey = await objectKeyFor(authToken);
       if (!objectKey) throw httpError(400, 'Bad team token.');
 
-      const existing = await store.getJson(`t/${objectKey}/meta.json`);
-      if (existing) return jsonResponse({ objectKey, created: false, contentTier: existing.contentTier || DEFAULT_TIER });
+      // Idempotent for the owner, so a retry after a dropped response is safe.
+      if (await store.head(`t/${objectKey}/meta.json`)) {
+        const cur = await authorizeTeam(store, objectKey, who, env);
+        return jsonResponse({ objectKey, created: false, contentTier: cur.value.contentTier || DEFAULT_TIER });
+      }
 
       // A new team inherits the class's current content level, so a teacher who
       // set the class to Storybook in September doesn't get a Gentle team back
@@ -934,11 +1047,13 @@ async function handleSync(path, request, env) {
       // plaintext — and nothing ever read it back. Everything else here is opaque
       // ciphertext; there is no reason for this file to be the exception. The
       // content level is not identifying — it is a property of the class, not a
-      // person, and the Worker must be able to read it to enforce it.
+      // person, and the Worker must be able to read it to enforce it. `owner` is
+      // a hash of Google's opaque account id, not the email.
       await store.put(`t/${objectKey}/meta.json`, JSON.stringify({
         createdAt: Date.now(),
         rev: 0, updatedAt: 0, bytes: 0, blobCount: 0,
         contentTier,
+        owner: who.admin ? null : who.id,
       }), 'application/json');
       return jsonResponse({ objectKey, created: true, contentTier });
     }
@@ -957,12 +1072,16 @@ async function handleSync(path, request, env) {
     if (path === '/sync/policy' && request.method === 'POST') {
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
       if (isRegisterRateLimited(ip)) throw httpError(429, 'Too many attempts. Wait a minute.');
-      await verifyTeacher(request, env);
+      const who = await verifyTeacher(request, env);
 
       const { authToken, tier } = await request.json();
       if (!CONTENT_TIERS[tier]) throw httpError(400, 'Unknown content level.');
       const objectKey = await objectKeyFor(authToken);
       if (!objectKey) throw httpError(400, 'Bad team token.');
+      // Any Google account signs in, so being a teacher is not enough: it must
+      // be THIS team's teacher. Otherwise a student signed in with their own
+      // school account could loosen their class's level.
+      await authorizeTeam(store, objectKey, who, env);
 
       const metaKey = `t/${objectKey}/meta.json`;
       for (let attempt = 0; attempt < 4; attempt++) {
@@ -989,11 +1108,18 @@ async function handleSync(path, request, env) {
     if (path === '/sync/delete' && request.method === 'POST') {
       const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
       if (isRegisterRateLimited(ip)) throw httpError(429, 'Too many attempts. Wait a minute.');
-      await verifyTeacher(request, env);
+      const who = await verifyTeacher(request, env);
 
       const { authToken } = await request.json();
       const objectKey = await objectKeyFor(authToken);
       if (!objectKey) throw httpError(400, 'Bad team token.');
+      // No meta.json means an earlier delete was cut off part-way (keys go in
+      // list order, and meta.json is not last). There is no owner left to check,
+      // and refusing would strand the leftovers and block the teacher page,
+      // which stops before touching the disk when this call fails.
+      if (await store.head(`t/${objectKey}/meta.json`)) {
+        await authorizeTeam(store, objectKey, who, env);
+      }
 
       const prefix = `t/${objectKey}/`;
       const keys = await store.list(prefix);
@@ -1056,6 +1182,14 @@ async function handleSync(path, request, env) {
       const body = await request.arrayBuffer();
       if (body.byteLength > MAX_MANIFEST_BYTES) throw httpError(413, 'That story is too large to sync.');
 
+      // Absent from a page that predates split pages (fmt 1, slides inline):
+      // such a push says nothing about pages, so pages.json is left alone.
+      const pagesHeader = request.headers.get('X-Pages');
+      const pageIds = pagesHeader === null ? null : pagesHeader.split(',').filter(Boolean);
+      if (pageIds && (pageIds.length > MAX_PAGES || !pageIds.every(id => /^[0-9a-f]{64}$/.test(id)))) {
+        throw httpError(400, 'Bad page list.');
+      }
+
       // ── The actual compare-and-set, made atomic ──────────────────────────
       // The check above reads `meta` once and is a cheap rejection, but proves
       // nothing by itself: two requests can both read rev=N before either
@@ -1100,7 +1234,43 @@ async function handleSync(path, request, env) {
         store.delete(`t/${objectKey}/rev/${rev - KEEP_REVISIONS}.manifest`).catch(() => {});
       }
 
+      // After the commit, so a failure here costs only disk space, never the push.
+      if (pageIds) {
+        try { await retirePages(store, objectKey, pageIds, now); }
+        catch (e) { console.warn('retirePages failed:', e.message); }
+      }
+
       return jsonResponse({ rev, updatedAt: now });
+    }
+
+    // ── pages: like blobs, without the count (see retirePages) ──────────────
+    if (path === '/sync/pages/check' && request.method === 'POST') {
+      const { ids } = await request.json();
+      if (!Array.isArray(ids)) throw httpError(400, 'ids[] required.');
+      if (ids.length > MAX_PAGES) throw httpError(413, 'Too many pages in one story.');
+      const found = await Promise.all(
+        ids.map(id => /^[0-9a-f]{64}$/.test(id)
+          ? store.head(`t/${objectKey}/p/${id}`).then(r => !!r).catch(() => false)
+          : false),
+      );
+      return jsonResponse({ missing: ids.filter((_, i) => !found[i]) });
+    }
+
+    const pageMatch = path.match(/^\/sync\/page\/([0-9a-f]{64})$/);
+    if (pageMatch) {
+      const key = `t/${objectKey}/p/${pageMatch[1]}`;
+      if (request.method === 'GET') {
+        const body = await store.get(key);
+        if (!body) throw httpError(404, 'Page not found.');
+        return new Response(body, { status: 200, headers: { 'Content-Type': 'application/octet-stream' } });
+      }
+      if (request.method === 'PUT') {
+        if (await store.head(key)) return jsonResponse({ stored: false, existed: true });
+        const body = await request.arrayBuffer();
+        if (body.byteLength > MAX_PAGE_BYTES) throw httpError(413, 'That page is too large.');
+        await store.put(key, body);
+        return jsonResponse({ stored: true, existed: false }, 201);
+      }
     }
 
     // ── blobs/check: the batching that keeps a push to 1–2 requests instead of
@@ -1193,8 +1363,463 @@ async function handleSync(path, request, env) {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRINTED BOOKS — a teacher orders physical copies of a class's story.
+
+   Nothing is printed by this code, and nothing here talks to Staples: Staples
+   publishes no print-and-ship API that we know of. An order is an EMAIL to
+   PRINT_ORDER_EMAIL carrying the print-ready PDF, the shipping address and the
+   class details. Whoever reads that inbox places it with Staples and pays, so
+   it stays free for the school. Pointing PRINT_ORDER_EMAIL at a Staples print
+   centre that takes orders by email sends it straight to them. The human step
+   is also the abuse control: any Google account can sign in as a teacher.
+
+   The PDF is built in the teacher's browser from the decrypted story on their
+   disk. It is attached to the email and is NOT stored here: the relay holds
+   only bytes it cannot read, and a readable book would break that.
+
+   ALLOWANCES. All lifetime, all counted in copies (a reprint of a revised book
+   is another copy):
+     - 3 per teacher per school: one Google account ordering for one school.
+     - Raised to 6, once and automatically, when those 3 are used and the
+       teacher says what more are for (POST /print/raise).
+     - Beyond 6, by email: PRINT_LIMIT_OVERRIDES.
+     - 10 per school, every teacher together. Nothing raises it, overrides
+       included.
+   A failed order (the email did not go out) gives its copies back. There is no
+   cancelling: once the email is out, the copies are spent.
+
+   A "school" is the name the teacher types, squashed to letters and digits,
+   plus the 5-digit ZIP. It is self-declared, so a teacher who types a new
+   school name gets a new allowance; the order email names the school, and the
+   person placing the order is the check on that.
+
+   Worker settings:
+     RESEND_API_KEY        secret. Email goes out through Resend's HTTP API.
+     PRINT_ORDER_EMAIL     where orders go.
+     PRINT_FROM_EMAIL      optional sender. Defaults to Resend's shared test
+                           sender, which only delivers to the Resend account's
+                           own address; anything else needs a verified domain.
+     PRINT_LIMIT_OVERRIDES optional, "teacher@school.org=8, other@x.org=7". That
+                           teacher's limit at every school; the school cap of 10
+                           still applies.
+     CONTACT_EMAIL         optional. Where a teacher who wants more than 6 is
+                           told to write. Falls back to PRINT_ORDER_EMAIL.
+
+   Storage (no address, no book):
+     print/teacher/<hash of teacher id + school>.json
+         { used, limit, raised: { at, reason }?, orders: [{ id, at, copies }] }
+     print/school/<hash of school>.json
+         { used, orders: [{ id, at, copies }] }
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+const PRINT_BASE_LIMIT   = 3;
+const PRINT_RAISED_LIMIT = 6;
+const PRINT_SCHOOL_LIMIT = 10;
+const MAX_PDF_BASE64     = 30 * 1024 * 1024;   // Resend caps a whole email at 40MB
+const DEFAULT_FROM       = 'StorySprout <onboarding@resend.dev>';
+
+function printOverrideFor(email, env) {
+  for (const pair of String(env.PRINT_LIMIT_OVERRIDES || '').split(',')) {
+    const [who, n] = pair.split('=').map(s => (s || '').trim());
+    if (who && who.toLowerCase() === email && /^\d+$/.test(n)) return parseInt(n, 10);
+  }
+  return 0;
+}
+
+// The two records an order touches. The allowance hangs off the school, so
+// both the name and the ZIP are required.
+async function printKeys(who, schoolRaw, zipRaw) {
+  const school = String(schoolRaw || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const zip = (String(zipRaw || '').match(/\d{5}/) || [''])[0];
+  if (!school || !zip) throw httpError(400, 'Enter the school name and its 5-digit ZIP code.');
+  const sk = school + '|' + zip;
+  return {
+    teacherKey: `print/teacher/${await sha256Hex('print-teacher|' + who.id + '|' + sk)}.json`,
+    schoolKey:  `print/school/${await sha256Hex('print-school|' + sk)}.json`,
+  };
+}
+
+function teacherLimit(rec, who, env) {
+  return Math.max(rec?.limit || PRINT_BASE_LIMIT, printOverrideFor(who.email, env));
+}
+
+// What the teacher page shows. `remaining` is what can actually be ordered:
+// the smaller of the teacher's and the school's.
+function printAllowance(tRec, sRec, who, env) {
+  const limit = teacherLimit(tRec, who, env);
+  const teacherLeft = Math.max(0, limit - (tRec?.used || 0));
+  const schoolLeft = Math.max(0, PRINT_SCHOOL_LIMIT - (sRec?.used || 0));
+  return {
+    teacher: { used: tRec?.used || 0, limit, remaining: teacherLeft },
+    school:  { used: sRec?.used || 0, limit: PRINT_SCHOOL_LIMIT, remaining: schoolLeft },
+    remaining: Math.min(teacherLeft, schoolLeft),
+    canRaise: limit < PRINT_RAISED_LIMIT && !tRec?.raised && teacherLeft === 0 && schoolLeft > 0,
+    raised: !!tRec?.raised,
+    contact: env.CONTACT_EMAIL || env.PRINT_ORDER_EMAIL || null,
+  };
+}
+
+// Read-modify-write with a conditional put, retried when another write lands
+// in between. `change` gets the current value (or null) and returns the new
+// one, or undefined to write nothing, or throws. A record's FIRST write has no
+// etag to condition on, so two simultaneous first writes can both land.
+async function updateRecord(store, key, change) {
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const cur = await store.getJsonWithEtag(key);
+    const next = change(cur ? cur.value : null);
+    if (next === undefined) return cur ? cur.value : null;
+    if (await store.put(key, JSON.stringify(next), 'application/json', cur ? cur.etag : undefined)) return next;
+  }
+  throw httpError(409, 'That was busy. Try again in a moment.');
+}
+
+function quotaError() {
+  const e = httpError(429, 'quota');
+  e.quota = true;
+  return e;
+}
+
+// Return an order's copies to a record. Logged, not thrown: the caller is
+// already failing with the error that matters.
+async function giveBack(store, key, orderId) {
+  try {
+    await updateRecord(store, key, (cur) => {
+      const o = (cur?.orders || []).find(x => x.id === orderId);
+      if (!o) return undefined;
+      return { ...cur, used: Math.max(0, cur.used - o.copies), orders: cur.orders.filter(x => x.id !== orderId) };
+    });
+  } catch (e) {
+    console.error('could not give back order', orderId, 'on', key, e.message);
+  }
+}
+
+async function sendOrderEmail(env, { orderId, who, order, pdfBase64, allowance, raised }) {
+  const s = order.shipTo;
+  const text = [
+    `New StorySprout print order ${orderId}: ${order.copies} cop${order.copies === 1 ? 'y' : 'ies'}`,
+    '',
+    `Book:        ${order.title}`,
+    `Pages:       ${order.pages}`,
+    `Trim:        ${order.trim}`,
+    `Copies:      ${order.copies}`,
+    `Team:        ${order.teamName}`,
+    '',
+    `Teacher:     ${who.email}`,
+    `School:      ${s.school}`,
+    `Grades:      ${order.grades}`,
+    `Class size:  ${order.classSize}`,
+    `Allowance:   teacher ${allowance.teacher.used} of ${allowance.teacher.limit} used, ` +
+      `school ${allowance.school.used} of ${allowance.school.limit} used`,
+    raised ? `Raised to ${PRINT_RAISED_LIMIT} on ${new Date(raised.at).toISOString().slice(0, 10)}: ${raised.reason}` : null,
+    '',
+    'Ship to:',
+    ...[s.name, s.school, s.line1, s.line2, `${s.city}, ${s.state} ${s.zip}`,
+        s.phone && `Phone: ${s.phone}`].filter(Boolean),
+    '',
+    'The print-ready PDF is attached. Nothing has been ordered yet: place it with',
+    'Staples, or reply to the teacher if you are declining it.',
+  ].filter(line => line !== null).join('\n');
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: env.PRINT_FROM_EMAIL || DEFAULT_FROM,
+      to: [env.PRINT_ORDER_EMAIL],
+      reply_to: who.email,
+      subject: `Print order: ${order.copies} × "${order.title}" for ${who.email}`,
+      text,
+      attachments: [{ filename: `${orderId}.pdf`, content: pdfBase64 }],
+    }),
+  });
+  if (!res.ok) {
+    throw httpError(502, `Could not send the order email (${res.status}): ${(await res.text()).slice(0, 200)}`);
+  }
+}
+
+// Plain text from a request field, trimmed and length-capped. Typed by the
+// teacher or a child (the title), and it only ever lands in a plain-text email.
+function field(v, max) {
+  return String(v ?? '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, max);
+}
+
+async function handlePrint(path, request, env) {
+  try {
+    const store = makeStore(env);
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    if (isRegisterRateLimited(ip)) throw httpError(429, 'Too many attempts. Wait a minute.');
+    if (request.method !== 'POST') throw httpError(405, 'POST required.');
+
+    const who = await verifyTeacher(request, env);
+    // The allowance and the reply both hang off a real person's account.
+    if (who.admin) throw httpError(403, 'Sign in with Google to order printed books.');
+
+    const body = await request.json();
+    const ship = body.shipTo || {};
+    const { teacherKey, schoolKey } = await printKeys(who, body.school ?? ship.school, body.zip ?? ship.zip);
+    const allowance = async () => printAllowance(await store.getJson(teacherKey), await store.getJson(schoolKey), who, env);
+
+    if (path === '/print/quota') return jsonResponse(await allowance());
+
+    // From 3 to 6, once, with no human in the loop. What the teacher writes is
+    // kept and goes out with every later order email.
+    if (path === '/print/raise') {
+      const reason = field(body.reason, 500);
+      if (reason.length < 10) throw httpError(400, 'Tell us a little about what the extra books are for.');
+      const now = await allowance();
+      if (!now.canRaise) {
+        throw httpError(409, now.raised || now.teacher.limit >= PRINT_RAISED_LIMIT
+          ? 'Your allowance has already been raised. For more books, email us.'
+          : now.school.remaining === 0
+            ? 'Your school has used all of its books.'
+            : 'You can ask for more once your first 3 books are used.');
+      }
+      await updateRecord(store, teacherKey, (cur) => {
+        if (cur?.raised) return undefined;
+        return { used: 0, orders: [], ...cur, limit: PRINT_RAISED_LIMIT, raised: { at: Date.now(), reason } };
+      });
+      return jsonResponse(await allowance());
+    }
+
+    if (path === '/print/order') {
+      if (!env.RESEND_API_KEY || !env.PRINT_ORDER_EMAIL) {
+        throw httpError(503, 'Printing is not set up on the server yet.');
+      }
+
+      const pdfBase64 = String(body.pdf || '');
+      if (!pdfBase64.startsWith('JVBERi')) throw httpError(400, 'The book file is missing or is not a PDF.');   // "%PDF" in base64
+      if (pdfBase64.length > MAX_PDF_BASE64) throw httpError(413, 'That book is too large to send. Try one with fewer pages.');
+
+      const order = {
+        title:     field(body.title, 120) || 'Untitled',
+        teamName:  field(body.teamName, 60),
+        pages:     Math.max(0, parseInt(body.pages, 10) || 0),
+        trim:      field(body.trim, 60),
+        copies:    parseInt(body.copies, 10),
+        grades:    field(body.grades, 60),
+        classSize: parseInt(body.classSize, 10),
+        shipTo: {
+          name:   field(ship.name, 100),
+          school: field(ship.school, 120),
+          line1:  field(ship.line1, 120),
+          line2:  field(ship.line2, 120),
+          city:   field(ship.city, 80),
+          state:  field(ship.state, 40),
+          zip:    field(ship.zip, 20),
+          phone:  field(ship.phone, 40),
+        },
+      };
+      const s = order.shipTo;
+      if (!s.name || !s.school || !s.line1 || !s.city || !s.state || !s.zip) {
+        throw httpError(400, 'Please fill in the recipient, the school and the full mailing address.');
+      }
+      if (!order.grades) throw httpError(400, 'Please say which grades the students are in.');
+      if (!(order.classSize >= 1 && order.classSize <= 1000)) throw httpError(400, 'Please enter the class size.');
+      if (!(order.copies >= 1 && order.copies <= PRINT_SCHOOL_LIMIT)) throw httpError(400, 'Choose how many copies.');
+
+      const orderId = 'SP-' + Date.now().toString(36).toUpperCase() + '-' + crypto.randomUUID().slice(0, 4).toUpperCase();
+      const entry = { id: orderId, at: Date.now(), copies: order.copies };
+
+      // Copies are reserved BEFORE the email goes, teacher first and then the
+      // school, so two orders racing each other cannot both squeeze into the
+      // last copy. Each step undoes the ones before it if it fails.
+      let tRec;
+      try {
+        tRec = await updateRecord(store, teacherKey, (cur) => {
+          const c = cur || { used: 0, limit: PRINT_BASE_LIMIT, orders: [] };
+          if (c.used + order.copies > teacherLimit(c, who, env)) throw quotaError();
+          return { ...c, used: c.used + order.copies, orders: [...c.orders, entry] };
+        });
+      } catch (e) {
+        if (e.quota) return jsonResponse({ error: 'quota', ...(await allowance()) }, 429);
+        throw e;
+      }
+
+      try {
+        await updateRecord(store, schoolKey, (cur) => {
+          const c = cur || { used: 0, orders: [] };
+          if (c.used + order.copies > PRINT_SCHOOL_LIMIT) throw quotaError();
+          return { ...c, used: c.used + order.copies, orders: [...c.orders, entry] };
+        });
+      } catch (e) {
+        await giveBack(store, teacherKey, orderId);
+        if (e.quota) return jsonResponse({ error: 'quota', ...(await allowance()) }, 429);
+        throw e;
+      }
+
+      try {
+        await sendOrderEmail(env, { orderId, who, order, pdfBase64, allowance: await allowance(), raised: tRec.raised });
+      } catch (err) {
+        // The order never reached anyone, so it must not cost a copy.
+        await giveBack(store, teacherKey, orderId);
+        await giveBack(store, schoolKey, orderId);
+        throw err;
+      }
+
+      return jsonResponse({ orderId, ...(await allowance()) });
+    }
+
+    throw httpError(404, 'Not found: ' + request.method + ' ' + path);
+  } catch (err) {
+    return jsonResponse({ error: err.message }, err.status || 500);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   USAGE NOTICE — shown once, when a network passes 1,000 requests to Pip.
+
+   A "network" is the IP range a request comes from: the /24 for IPv4, the
+   first three groups for IPv6 (about a /48). A school sits behind one or a few
+   addresses, so this is close to "a school". Only a hash of the range is
+   stored, never an address.
+
+   Who sees it:
+     - a computer that is NOT in a class: the student, from the response that
+       crosses the line (header X-Usage-Notice: 1). The page then fetches the
+       text (GET /notice) and acks (POST /notice/ack).
+     - a computer that IS in a class: never the student. The team is noted, and
+       the teacher's page, signed in, asks with its teams' tokens
+       (POST /notice/teams), shows it, and acks.
+   Once acked, the range is never flagged again.
+
+   Until then, each AI request costs one R2 read (alongside the OpenAI call)
+   and one write (after the response). Concurrent requests can lose a count;
+   this is a threshold, not a meter.
+
+   The notice is a short form (school, class size, grade, after-school), and
+   the ack carries the answers: there is no way to close it without them.
+
+   Storage: usage/<hash of range>.json      { count, firstAt, shownAt, teams: [] }
+            usage-team/<team objectKey>.json { range: <usage key> }
+            survey/<hash of range>.json     { school, classSize, grade, afterSchool, at, from }
+   ═══════════════════════════════════════════════════════════════════════════ */
+const USAGE_NOTICE_AT = 1000;
+const USAGE_NOTICE = {
+  title: 'Help us improve Story Sprout',
+  text: 'Please share a few details about your class to help us improve Story Sprout.',
+};
+const usageDone = new Set();   // ranges already shown, per isolate: skips the R2 read
+
+function ipRange(ip) {
+  if (ip.includes(':')) return ip.toLowerCase().split(':').slice(0, 3).join(':') + '::/48';
+  const p = ip.split('.');
+  return p.length === 4 ? p.slice(0, 3).join('.') + '.0/24' : ip;
+}
+
+async function usageKeyFor(ip) {
+  return `usage/${await sha256Hex('usage|' + ipRange(ip))}.json`;
+}
+
+// Counts one AI request. Resolves to true when THIS response should carry the
+// notice to a student. Never throws: counting must never cost a child a picture.
+async function countUsage(request, env, ctx, ip) {
+  try {
+    if (!env.SPROUT_BUCKET || ip === 'unknown') return false;
+    const key = await usageKeyFor(ip);
+    if (usageDone.has(key)) return false;
+    const store = makeStore(env);
+    const rec = (await store.getJson(key)) || { count: 0, firstAt: Date.now(), shownAt: null, teams: [] };
+    if (rec.shownAt) { usageDone.add(key); return false; }
+
+    rec.count++;
+    let notify = false;
+    if (rec.count > USAGE_NOTICE_AT) {
+      const teamKey = await objectKeyFor(request.headers.get('X-Team-Auth') || '');
+      if (!teamKey) notify = true;
+      else if (!rec.teams.includes(teamKey) && rec.teams.length < 200) {
+        rec.teams.push(teamKey);
+        ctx.waitUntil(store.put(`usage-team/${teamKey}.json`, JSON.stringify({ range: key }), 'application/json'));
+      }
+    }
+    ctx.waitUntil(store.put(key, JSON.stringify(rec), 'application/json'));
+    return notify;
+  } catch (e) {
+    console.warn('usage count failed:', e.message);
+    return false;
+  }
+}
+
+async function markShown(store, key) {
+  await updateRecord(store, key, (cur) => cur
+    ? (cur.shownAt ? undefined : { ...cur, shownAt: Date.now() })
+    : { count: 0, firstAt: Date.now(), shownAt: Date.now(), teams: [] });
+  usageDone.add(key);
+}
+
+function readSurvey(s) {
+  s = s || {};
+  const school = String(s.school || '').trim().slice(0, 200);
+  const classSize = Number(s.classSize);
+  if (!school) throw httpError(400, 'School name is required.');
+  if (!Number.isInteger(classSize) || classSize < 1 || classSize > 1000) throw httpError(400, 'Class size must be a number from 1 to 1000.');
+  return { school, classSize, grade: String(s.grade || '').trim().slice(0, 60), afterSchool: s.afterSchool === true };
+}
+
+async function saveSurvey(store, rangeKey, survey, from) {
+  await store.put(rangeKey.replace(/^usage\//, 'survey/'),
+    JSON.stringify({ ...survey, at: new Date().toISOString(), from }), 'application/json');
+}
+
+async function handleNotice(path, request, env) {
+  try {
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    if (isRateLimited(ip)) throw httpError(429, 'Too many requests. Wait a minute.');
+    const notice = USAGE_NOTICE;
+
+    if (path === '/notice' && request.method === 'GET') return jsonResponse(notice);
+    if (request.method !== 'POST') throw httpError(405, 'POST required.');
+    const store = makeStore(env);
+
+    if (path === '/notice/ack') {
+      const survey = readSurvey((await request.json().catch(() => ({}))).survey);
+      const key = await usageKeyFor(ip);
+      await saveSurvey(store, key, survey, 'student');
+      await markShown(store, key);
+      return jsonResponse({ ok: true });
+    }
+
+    if (path === '/notice/teams' || path === '/notice/teams/ack') {
+      await verifyTeacher(request, env);
+      const body = await request.json();
+      const { authTokens } = body;
+      const survey = path === '/notice/teams/ack' ? readSurvey(body.survey) : null;
+      if (!Array.isArray(authTokens) || authTokens.length > 200) throw httpError(400, 'authTokens[] required.');
+
+      const markers = [];
+      for (const token of authTokens) {
+        const k = await objectKeyFor(token);
+        if (!k) continue;
+        const m = await store.getJson(`usage-team/${k}.json`);
+        if (m) markers.push({ k, range: m.range });
+      }
+
+      if (path === '/notice/teams') {
+        let owed = false;
+        for (const m of markers) {
+          const rec = await store.getJson(m.range);
+          if (rec && !rec.shownAt) owed = true;
+          else await store.delete(`usage-team/${m.k}.json`);   // a student already saw it
+        }
+        return jsonResponse({ notice: owed ? notice : null });
+      }
+
+      for (const m of markers) {
+        await saveSurvey(store, m.range, survey, 'teacher');
+        await markShown(store, m.range);
+        await store.delete(`usage-team/${m.k}.json`);
+      }
+      return jsonResponse({ ok: true });
+    }
+
+    throw httpError(404, 'Not found: ' + request.method + ' ' + path);
+  } catch (err) {
+    return jsonResponse({ error: err.message }, err.status || 500);
+  }
+}
+
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin');
     const cors = corsHeaders(origin);
 
@@ -1215,6 +1840,12 @@ export default {
       if (path.startsWith('/sync/')) {
         return withCors(await handleSync(path, request, env), cors);
       }
+      if (path.startsWith('/print/')) {
+        return withCors(await handlePrint(path, request, env), cors);
+      }
+      if (path === '/notice' || path.startsWith('/notice/')) {
+        return withCors(await handleNotice(path, request, env), cors);
+      }
 
       // ── AI routes ────────────────────────────────────────────────────────
       if (request.method !== 'POST') {
@@ -1231,6 +1862,10 @@ export default {
       // body. Falls to the strictest level on any doubt; see resolveTier().
       const tier = await resolveTier(request, env);
 
+      const isAiRoute = path === '/image' || path === '/image-edit' || path === '/chat' || path === '/';
+      // Started now so its R2 read overlaps the OpenAI call.
+      const usage = isAiRoute ? countUsage(request, env, ctx, ip) : Promise.resolve(false);
+
       let resp;
       if      (path === '/image')      resp = await handleImage(await request.json(), env, tier);
       else if (path === '/image-edit') resp = await handleImageEdit(await request.json(), env, tier);
@@ -1239,6 +1874,7 @@ export default {
       // meant a typo'd path silently called OpenAI and burned API credit.
       else resp = jsonResponse({ error: 'Not found: ' + path }, 404);
 
+      if (await usage && resp.ok) resp.headers.set('X-Usage-Notice', '1');
       return withCors(resp, cors);
     } catch (err) {
       return withCors(jsonResponse({ error: err.message }, 500), cors);

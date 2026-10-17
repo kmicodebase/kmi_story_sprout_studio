@@ -25,12 +25,13 @@ It doubles as a research tool for studying how children learn to **describe and 
 
 ## 🎨 Features
 
-- **🖌️ Pip, the conversational illustrator** — chat with Pip in plain language. It asks about your idea, draws it when it has enough detail, and asks *"Is this the picture you imagined?"* so kids reflect and refine. Place a revision **side-by-side** with the old one to compare, and tell Pip to remove the one you don't want.
+- **🖌️ Pip, the conversational illustrator** — chat with Pip in plain language. It asks about your idea, draws it when it has enough detail, and asks *"Is this the picture you imagined?"* so kids reflect and refine. Place a revision **side-by-side** with the old one to compare, and tell Pip to remove the one you don't want. A changed picture shows the one it came from beside it; **Keep the old one** turns the new one down, and **Pictures** lists every picture Pip has made, with **Swap** to put an earlier one back in place. Pictures go under the page's words, never over them.
 - **🧩 Canvas editor** — text boxes, shapes, and images on a Fabric.js canvas with move/scale/rotate, layering, and alignment.
 - **📚 Multi-slide stories** — build a picture book one slide at a time, with thumbnails.
 - **↩️ Undo / redo** — per-slide history (up to 50 steps).
-- **💾 Local-first saving** — saves `story.json` + image files to a folder you pick (File System Access API); auto-saves every few seconds.
-- **🍎 Teacher Mode** — a teacher can collect every child's work onto their own computer, automatically. Children never make accounts. See below.
+- **💾 Local-first saving** — saves `story.json` + image files to a folder you pick (File System Access API); auto-saves every few seconds. The indicator says where the story is (*Saved on this computer*, *Saved to* a file, or *Not saved!* with the reason), and on return the Studio offers the saved story back instead of opening blank.
+- **📖 Whole-book preview** — every page in order, saved as a PDF at the book's print size or printed at home. Neither uses any printed-book allowance. *Export PNG* still saves a single page.
+- **🍎 Teacher Mode** — a teacher can collect every child's work onto their own computer, automatically, read each book, and order free printed copies. Children never make accounts. The **Teacher** button opens it over the Studio, so the story on screen is still there afterwards. See below.
 - **🔒 Safe by design** — Pip is scoped to illustration only, with content guardrails appropriate for young children.
 
 ## 🏗️ Architecture
@@ -152,7 +153,7 @@ The teacher and the student each derive all three from `(team name, secret code)
 
 Every AI image is base64-inlined into each slide *and* duplicated in the history, so a six-page story runs ~50MB. Re-uploading that every five minutes, per device, over school wifi would be hopeless.
 
-So images are **content-addressed**: each one is hashed, uploaded exactly once, and referenced by hash thereafter. The recurring payload is just the story skeleton — gzipped and encrypted, **about 1.5KB**, or ~4,000× smaller. On the teacher's disk, images live in one shared folder, so a snapshot every five minutes costs kilobytes rather than gigabytes.
+So images are **content-addressed**: each one is hashed, uploaded exactly once, and referenced by hash thereafter. Pages get the same treatment: each page (its layout and words, without the pictures) is its own encrypted object, so a push sends only the pages that changed plus a short manifest listing the pages in order. A small edit is one page of about 1KB and a manifest of under 1KB; adding, deleting or reordering pages changes only the manifest. The teacher's page downloads only pages and images it does not already have. On the teacher's disk, images and pages live in shared folders, so a snapshot every five minutes costs kilobytes rather than gigabytes.
 
 ### What lands on the teacher's disk
 
@@ -161,6 +162,7 @@ Class folder/
 ├── teacher.json          ← teams + secret codes.  ⚠ This is the master key. Lose it and the work is unrecoverable.
 ├── class.json            ← index of every team's work
 ├── images/<hash>.png     ← decrypted, shared across all teams and snapshots
+├── pages/<hash>.json     ← decrypted pages, shared the same way
 └── teams/brave-otter/
     ├── latest.json       ← the full story — opens directly in workshop-plugin.html
     └── snapshots/…       ← dated history of how the story grew
@@ -171,9 +173,10 @@ Class folder/
 **Cloudflare** (same Worker as Pip — the sync routes live alongside `/chat` and `/image`):
 1. **R2 → Create bucket**, then **Worker → Settings → Bindings → R2 bucket**, variable name `SPROUT_BUCKET`.
 2. Add a secret `TEACHER_PASSPHRASE` — long and random. This is the fallback sign-in.
-3. *(Optional, for Google sign-in)* add plain vars `GOOGLE_CLIENT_ID` and `ALLOWED_TEACHER_EMAILS`.
+3. *(Optional, for Google sign-in)* add plain var `GOOGLE_CLIENT_ID`. Any verified Google account can then sign in as a teacher; each team belongs to the teacher who made it. `ALLOWED_TEACHER_EMAILS` is now optional and only says who may claim a team created before teams had owners.
+4. *(Optional, for printed books)* add secret `RESEND_API_KEY` and plain var `PRINT_ORDER_EMAIL` (where orders go: your inbox, or a Staples print centre that takes orders by email). `PRINT_FROM_EMAIL` sets the sender (default is Resend's shared test sender, which only delivers to the Resend account's own address). `CONTACT_EMAIL` is the address teachers are shown when they want more than 6 books; it falls back to `PRINT_ORDER_EMAIL`. Allowances are lifetime and counted in copies: 3 per teacher per school, raised once to 6 when the teacher says what more are for, and never more than 10 per school across all its teachers. `PRINT_LIMIT_OVERRIDES` raises one teacher's limit, e.g. `teacher@school.org=8`; the school's 10 still applies.
 
-**Google sign-in** (optional — the passphrase alone works fine): create an OAuth **Web application** client in Google Cloud. Authorized JavaScript origins must include `https://kmicodebase.github.io` **and** `http://localhost:8000`; leave redirect URIs empty. Paste the client ID into `GOOGLE_CLIENT_ID` in `teacher.html` (client IDs are public — safe to commit). This list is **separate** from the Worker's `ALLOWED_ORIGINS` — see [Three allowlists](#3-three-allowlists-three-different-places).
+**Google sign-in** (optional — the passphrase alone works fine): create an OAuth **Web application** client in Google Cloud. Authorized JavaScript origins must include `https://kmicodebase.github.io` **and** `http://localhost:8000`; leave redirect URIs empty. Paste the client ID into `GOOGLE_CLIENT_ID` in `teacher.html` (client IDs are public — safe to commit). This list is **separate** from the Worker's `ALLOWED_ORIGINS` — see [Three allowlists](#3-three-allowlists-three-different-places). For anyone to sign in, the OAuth consent screen must be **published** (In production), not in Testing, where only listed test users can.
 
 **Requires Chrome or Edge.** Saving to a folder needs the File System Access API, which Firefox and Safari do not implement. When Chrome asks about the folder, choose **"Allow on every visit"** or it will re-prompt every session.
 
@@ -187,6 +190,7 @@ Class folder/
 | `workshop-plugin.html` | **The app** — Pip, the conversational illustrator |
 | `teacher.html` | **Teacher Mode dashboard** — create teams, collect student work |
 | `sprout-sync.js` | Shared crypto + content-addressing + relay client (used by **both** pages) |
+| `sprout-book.js` | Shared page renderer and PDF builder: the Studio's book preview and PDF, the teacher's book viewer and print orders |
 | `sprout-sync-test.html` | Test harness for the above — open it and click *Run tests* |
 | `cloudflare-worker/pip-worker.js` | **OpenAI proxy** for Pip **and** the sync relay. Also holds `PIP_SYSTEM`, the source of truth for Pip's behaviour |
 | `RESEARCH_DATA.md` | Codebook for the local story-file schema (`childWords` vs. the composed prompt; v6) |
@@ -249,6 +253,9 @@ The Worker exposes:
 | `GET · PUT /sync/manifest` | The encrypted story. `PUT` is compare-and-set on a **server-assigned** revision — student clocks are never trusted. |
 | `POST /sync/blobs/check` | `{ ids[] } → { missing[] }`, so a routine sync is two requests, not twenty |
 | `GET · PUT /sync/blob/<id>` | An encrypted image. Immutable, content-addressed. |
+| `POST /sync/pages/check` · `GET · PUT /sync/page/<id>` | Encrypted pages, the same way. A page no push has used for a day is deleted. |
+| `POST /print/quota` · `/print/raise` · `/print/order` | Teacher only (Google). Printed-book allowance, the one-time raise to 6, and the order email. |
+| `GET /notice` · `POST /notice/ack` · `/notice/teams` · `/notice/teams/ack` | The one-time "Help us improve Story Sprout" form when a network passes 1,000 requests. Answers land in R2 under `survey/` |
 | `GET · PUT /sync/assign` | The teacher's assignment — its own object, so it can't race a student's push |
 
 ## ⌨️ Keyboard shortcuts

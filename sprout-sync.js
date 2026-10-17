@@ -347,6 +347,54 @@ async function rehydrate(manifestStory, blobs) {
   return out;
 }
 
+/* ── pages: send only what changed ───────────────────────────────────────────
+   With the images gone, each page is still its Fabric JSON plus a thumbnail,
+   and the manifest used to carry every page on every push: nudging one text
+   box resent the whole book. So pages leave the manifest too, each as its own
+   encrypted object addressed by the hash of its content, exactly like an
+   image. A push uploads only pages the relay does not already hold, and the
+   manifest keeps the ordered list of page hashes. Adding, deleting or
+   reordering pages is then a change to that list and nothing more.
+
+   Page ids are HMAC'd like image ids, with a "page|" prefix so a page and an
+   image can never share an id.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+// manifestStory (from stripImages) → { skeleton, order: [hash], pages: Map<hash, bytes> }
+async function splitPages(manifestStory) {
+  const skeleton = { ...manifestStory };
+  delete skeleton.slides;
+  const order = [];
+  const pages = new Map();
+  for (const slide of (manifestStory.slides || [])) {
+    const bytes = enc(JSON.stringify(slide));
+    const hash = await sha256Hex(bytes);
+    pages.set(hash, bytes);
+    order.push(hash);
+  }
+  return { skeleton, order, pages };
+}
+
+// The inverse: the manifestStory that stripImages produced, ready for rehydrate().
+function joinPages(skeleton, order, pages) {
+  const out = { ...skeleton };
+  out.slides = order.map((hash) => {
+    const bytes = pages.get(hash);
+    if (!bytes) {
+      const err = new Error('Missing page ' + hash.slice(0, 12));
+      err.code = 'MISSING_PAGE';
+      err.hash = hash;
+      throw err;
+    }
+    return JSON.parse(dec(bytes));
+  });
+  return out;
+}
+
+function pageIdFor(blobKey, pageHash) {
+  return blobIdFor(blobKey, 'page|' + pageHash);
+}
+
 /* ── key cache (IndexedDB) ───────────────────────────────────────────────────
    We cache the DERIVED KEYS, never the secret code. IndexedDB structured-clones
    CryptoKey, and encKey is non-extractable — so this is both nicer (later visits
@@ -426,6 +474,9 @@ window.SproutSync = {
   // transform
   stripImages,
   rehydrate,
+  splitPages,
+  joinPages,
+  pageIdFor,
 
   // key cache
   cacheKeys,

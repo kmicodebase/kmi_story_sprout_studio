@@ -16,6 +16,8 @@ It also has a **Teacher Mode**: a teacher collects every child's work onto their
 | `teacher.html` | Teacher Mode dashboard — create teams, collect student work. |
 | `sprout-sync.js` | Shared crypto + content-addressing + relay client. Loaded by **both** pages. |
 | `sprout-sync-test.html` | Test harness for the above. Open it, click *Run tests*. |
+| `sprout-book.js` | Draws a story's pages and builds the PDF. Loaded by **both** pages: the Studio's book preview/PDF/print and the teacher's book viewer and print orders. Needs Fabric. |
+| `FEATURE_CHECKLIST.md` | The 16 October 2026 feature spec, transcribed from the PDF it came in. |
 | `cloudflare-worker/pip-worker.js` | The OpenAI proxy **and** the sync relay. |
 | `pii-filter-test.html` | Test harness for the personal-info filter. Open it, click *Run tests*. |
 | `evaluations/content_safeguard/` | Content-safeguard evaluation — protocol, stimuli, runner, and three rounds of results. |
@@ -47,7 +49,7 @@ Browser app → **Cloudflare Worker** (`https://storysprout-pip.jackwangxyw.work
   default differs per model — so `handleChat` states `'low'` explicitly. Swapping
   the chat model is **not** a one-line change; read `handleChat` first. The
   measured comparison that picked it is in a comment right there.
-- Worker routes: `/chat`, `/image`, `/image-edit`, and `/sync/*` for Teacher Mode.
+- Worker routes: `/chat`, `/image`, `/image-edit`, `/sync/*` for Teacher Mode, `/print/*` for printed books (rules in the PRINTED BOOKS block), and `/notice*` for the one-time 1,000-request class survey (USAGE NOTICE block; answers are stored in R2 under `survey/`).
 - The Worker is deployed by **pasting it into the Cloudflare dashboard** — no wrangler, no bundler, so it must stay a single dependency-free file. The repo copy and the deployed copy drift easily; the repo is the source of truth.
 - The site is served from GitHub Pages at `https://kmicodebase.github.io/kmi_story_sprout_studio/`.
 
@@ -84,9 +86,12 @@ All app state is in the `S` object:
 | Pages | `saveCurrentSlide()`, `loadSlide()`, `addSlide()`, `deleteSlide()`, `movePage()`, `renderSlideThumbs()` |
 | History | `pushHistory()`, `undo()`, `redo()` |
 | Elements | `addTextBox()`, `addShape()`, `addImageSrc()`, `deleteSelected()`, `duplicateSelected()` |
-| Pip | `pipSend()`, `pipGenerate()` — talks to the Worker |
-| Persistence | `buildStoryJson()` / `loadStoryData()` — the single choke point for the story format |
-| Teacher sync | `syncPush()`, `syncRestore()`, `initTeacherMode()` |
+| Pip | `pipSend()`, `pipGenerate()` — talks to the Worker. `pipBaseId` is the picture the next change is drawn from; `pipKeepOld()` steps it back |
+| Pictures | `renderImageBank()`, `swapSelectedImage()`, `addBelowText()` — Pip's pictures go under the page's words |
+| Persistence | `buildStoryJson()` / `loadStoryData()` — the single choke point for the story format. `loadStoryData()` also writes the IndexedDB autosave, so what was opened is what a reload offers back (`offerResume()`) |
+| Saving | `autosaveNow()`, `setSaveStatus()` — the label must only claim what is true; failures show as *Not saved!* |
+| Book | `openBookView()`, `bookPdf()`, `bookPrint()` — all local; never touches `/print/*` |
+| Teacher sync | `syncPush()`, `syncRestore()`, `initTeacherMode()`; `openTeacher()` puts `teacher.html?embedded=1` in a frame over the Studio |
 
 ⚠️ **`canvas.add()` fires `object:added` synchronously**, which snapshots history and regenerates the thumbnail. **Position an object BEFORE adding it**, or the recorded state will hold the pre-move position while the canvas shows the post-move one — undo then faithfully restores the wrong thing. This was a real bug in `addShape()`.
 
@@ -110,9 +115,11 @@ authToken = HKDF(master, "auth")  proves team membership; cannot be reversed int
 blobKey   = HKDF(master, "blob")  HMACs image ids, so a bucket listing reveals nothing
 ```
 
-Because stories are ~50MB, images are **content-addressed**: hashed, uploaded once, referenced by hash. The recurring sync is a gzipped encrypted skeleton, ~1.5KB. `sprout-sync-test.html` proves the round-trip is byte-identical.
+Because stories are ~50MB, images are **content-addressed**: hashed, uploaded once, referenced by hash. Pages are too (manifest `fmt: 2`): each page is its own encrypted object under `/sync/page/<id>`, and the manifest holds `pageOrder` plus the skeleton. A small edit sends one ~1KB page and a <1KB manifest; reordering sends no pages. `sprout-sync-test.html` proves both round-trips are byte-identical.
 
-⚠️ **`sprout-sync.js` is shared byte-for-byte by both pages.** Change any crypto constant and you must bump `VERSION`, both pages' `REQUIRE_SYNC_VERSION`, **and** the `?v=` on both script tags — together. A stale cached copy on one page derives different keys and fails **silently**: uploads succeed, collection succeeds, stories never open. Both pages assert the version on boot to turn that into a loud error.
+⚠️ Pages are **not** counted against `MAX_BLOBS_PER_TEAM` — they churn on nearly every edit. Each manifest push names its pages in the `X-Pages` header, and `retirePages()` deletes a page no push has used for 24h. A push without `X-Pages` (an old cached Studio sending `fmt: 1`) leaves pages alone, and both pages still read `fmt: 1`. Keep both of those true until no `fmt: 1` client can exist.
+
+⚠️ **`sprout-sync.js` is shared byte-for-byte by both pages.** Change any crypto constant and you must bump `VERSION`, both pages' `REQUIRE_SYNC_VERSION`, **and** the `?v=` on both script tags — together. Any other change to it (or to `sprout-book.js`) still needs the `?v=` bumped on every page that loads it, including `sprout-sync-test.html`, or browsers keep the old copy. A stale cached copy on one page derives different keys and fails **silently**: uploads succeed, collection succeeds, stories never open. Both pages assert the version on boot to turn that into a loud error.
 
 ⚠️ **The `storysketch_*` IndexedDB keys keep their old name on purpose.** Renaming them would orphan every existing user's autosave and file handle.
 
@@ -148,8 +155,12 @@ survive any edit here:
    `resolveTier()` from the team token. It is **never** read from a request body,
    so there is nothing in the request for a student to edit.
 2. Writing it requires `POST /sync/policy`, which demands a **verified teacher
-   identity** (`verifyTeacher`), exactly like `/sync/delete`. The team token
-   alone is not enough — every child in the class knows that token.
+   identity** (`verifyTeacher`) **that owns the team** (`authorizeTeam`), exactly
+   like `/sync/delete`. The team token alone is not enough — every child in the
+   class knows that token. Being *a* teacher is not enough either: any Google
+   account can sign in, students' school accounts included, so `meta.owner`
+   (a hash of Google's `sub`) is what actually holds this up. Teams from before
+   owners existed can be claimed only by an email in `ALLOWED_TEACHER_EMAILS`.
 3. `resolveTier()` returns the **strictest** level on every failure path: no
    token, unknown token, no `meta.json`, R2 unreachable, unrecognised level.
    So tampering can only ever tighten, never loosen.

@@ -11,7 +11,12 @@
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <!-- Shared byte-for-byte with workshop-plugin.html. If the crypto in the two pages
      ever drifts, this page silently cannot decrypt student work. Bump ?v= together. -->
-  <script src="sprout-sync.js?v=1"></script>
+  <script src="sprout-sync.js?v=2"></script>
+  <!-- For reading a collected book and for printed books: draws each page the same
+       way the Studio does, so what the teacher sees and orders matches what the
+       children made. sprout-book.js is shared with the Studio. -->
+  <script src="vendor/fabric.min.js"></script>
+  <script src="sprout-book.js?v=1"></script>
   <style>
     :root {
       --purple: #7c5cff;
@@ -571,6 +576,203 @@
       margin-top: 10px;
       display: flex;
       justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .print-link {
+      background: none;
+      border: none;
+      padding: 4px 2px;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--purple-dark);
+      cursor: pointer;
+    }
+
+    .print-link:hover {
+      background: none;
+      text-decoration: underline;
+    }
+
+    #print-back {
+      position: fixed;
+      inset: 0;
+      z-index: 9000;
+      background: rgba(24, 20, 40, .55);
+      backdrop-filter: blur(3px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #print-back.open {
+      display: flex;
+    }
+
+    .confirm-card.print-card h3 {
+      color: var(--purple-dark);
+    }
+
+    .confirm-card.print-card input:focus {
+      border-color: var(--purple);
+    }
+
+    .pr-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+    }
+
+    .pr-grid .wide {
+      grid-column: 1 / -1;
+    }
+
+    .pr-f {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--ink2);
+    }
+
+    .print-card .pr-quota {
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .print-card .pr-done {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .confirm-card.print-card {
+      width: 520px;
+      max-height: 92vh;
+      overflow-y: auto;
+    }
+
+    .pr-section {
+      margin: 14px 0 6px;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--ink3);
+    }
+
+    .pr-allow {
+      margin: 0 0 4px;
+      font-size: 13px;
+    }
+
+    .pr-raise {
+      margin-top: 12px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--purple-bg);
+    }
+
+    .pr-raise textarea {
+      width: 100%;
+      min-height: 64px;
+      margin: 8px 0;
+      font-family: var(--font);
+      font-size: 13px;
+      padding: 8px 10px;
+      border: 1.5px solid var(--border);
+      border-radius: 8px;
+      resize: vertical;
+    }
+
+    .pr-raise a {
+      color: var(--purple-dark);
+      font-weight: 700;
+    }
+
+    /* Reading a whole collected book, one page at a time, at a readable size. */
+    #book-back {
+      position: fixed;
+      inset: 0;
+      z-index: 9200;
+      background: rgba(24, 20, 40, .86);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 14px;
+      padding: 24px;
+    }
+
+    #book-back.open {
+      display: flex;
+    }
+
+    #book-page {
+      max-width: 100%;
+      max-height: calc(100vh - 140px);
+      border-radius: 6px;
+      background: var(--white);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .5);
+    }
+
+    .book-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .book-bar button {
+      min-width: 44px;
+    }
+
+    #book-title {
+      color: #fff;
+      font-size: 16px;
+      font-weight: 800;
+    }
+
+    .read-link {
+      background: none;
+      border: none;
+      padding: 4px 2px;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--purple-dark);
+      cursor: pointer;
+    }
+
+    .read-link:hover {
+      background: none;
+      text-decoration: underline;
+    }
+
+    #notice-back {
+      position: fixed;
+      inset: 0;
+      z-index: 9300;
+      background: rgba(24, 20, 40, .55);
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #notice-back.open {
+      display: flex;
+    }
+
+    /* Opened from inside the Studio: the Studio is still there underneath, and
+       this is the way back to it. */
+    #back-to-studio {
+      display: none;
+    }
+
+    body.embedded #back-to-studio {
+      display: inline-flex;
     }
 
     .del-link {
@@ -788,6 +990,7 @@
     <span id="who" style="font-size:12px;color:var(--ink3)"></span>
     <button class="ghost hide" id="switch-signin" style="font-size:11px;padding:6px 10px">Switch</button>
     <button class="ghost" id="sync-now" disabled>Collect work now</button>
+    <button id="back-to-studio" title="Close the teacher page. The story open in the Studio is untouched.">Back to Studio</button>
   </header>
 
   <main>
@@ -930,6 +1133,90 @@
       <div class="confirm-row">
         <button class="ghost" id="del-cancel">Cancel</button>
         <button class="btn-danger" id="del-go" disabled>Delete forever</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Printed book order. Nothing is charged to the school: the order is emailed
+       to the StorySprout team, who place it with Staples and pay for it. -->
+  <div id="print-back">
+    <div class="confirm-card print-card">
+      <h3>Order printed books</h3>
+      <p><strong id="pr-title">—</strong> · <span id="pr-pages">—</span></p>
+
+      <div class="pr-section">School</div>
+      <div class="pr-grid">
+        <label class="pr-f wide"><span>School name</span><input id="pr-school" placeholder="School name" autocomplete="organization"></label>
+        <label class="pr-f"><span>School ZIP</span><input id="pr-zip" placeholder="School ZIP" autocomplete="postal-code" inputmode="numeric"></label>
+        <label class="pr-f"><span>Grades</span><input id="pr-grades" placeholder="Grades, e.g. 2–3"></label>
+        <label class="pr-f"><span>Class size</span><input id="pr-class" placeholder="Class size" inputmode="numeric"></label>
+      </div>
+
+      <div class="pr-section">Your books</div>
+      <p class="pr-allow" id="pr-allow-teacher">Enter the school name and ZIP to see your books.</p>
+      <p class="pr-allow" id="pr-allow-school"></p>
+      <div class="pr-raise hide" id="pr-raise">
+        <b>Need more books?</b> Tell us what they are for and your allowance goes up to 6.
+        <textarea id="pr-reason" maxlength="500" placeholder="e.g. one copy for each reading group, and one for the school library"></textarea>
+        <button id="pr-raise-go">Raise to 6</button>
+      </div>
+      <div class="pr-raise hide" id="pr-more">
+        <span id="pr-more-text"></span> <a id="pr-more-mail" href="#">Email us</a>
+      </div>
+
+      <div class="pr-section">Mail to</div>
+      <div class="pr-grid">
+        <label class="pr-f wide"><span>Recipient</span><input id="pr-name" placeholder="Recipient name" autocomplete="name"></label>
+        <label class="pr-f wide"><span>Street address</span><input id="pr-line1" placeholder="Street address" autocomplete="address-line1"></label>
+        <label class="pr-f wide"><span>Room or suite</span><input id="pr-line2" placeholder="Room, suite (optional)" autocomplete="address-line2"></label>
+        <label class="pr-f"><span>City</span><input id="pr-city" placeholder="City" autocomplete="address-level2"></label>
+        <label class="pr-f"><span>State</span><input id="pr-state" placeholder="State" autocomplete="address-level1"></label>
+        <label class="pr-f"><span>Phone</span><input id="pr-phone" placeholder="Phone (optional)" autocomplete="tel"></label>
+      </div>
+
+      <div class="pr-grid">
+        <label class="pr-f"><span>Copies</span><input id="pr-copies" type="number" min="1" max="10" value="1"></label>
+      </div>
+
+      <p class="pr-quota" id="pr-quota"></p>
+      <p style="margin-top:12px">This book, the address and the class details go to the StorySprout
+        team, who order it from Staples and have it mailed to you. It is free for your school. Every
+        copy counts as one book, a reprint of a changed story included. An order that fails to send
+        does not count. Orders cannot be cancelled once sent.</p>
+      <div class="err" id="pr-err"></div>
+      <div class="confirm-row">
+        <button class="ghost" id="pr-cancel">Cancel</button>
+        <button id="pr-go">Send order</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- A whole collected book, page by page. -->
+  <div id="book-back">
+    <div id="book-title">—</div>
+    <img id="book-page" alt="">
+    <div class="book-bar">
+      <button class="ghost" id="book-prev" aria-label="Previous page">‹</button>
+      <span id="book-count">—</span>
+      <button class="ghost" id="book-next" aria-label="Next page">›</button>
+      <button class="ghost" id="book-close">Close</button>
+    </div>
+  </div>
+
+  <!-- The one-time usage notice (see USAGE NOTICE in pip-worker.js). -->
+  <div id="notice-back">
+    <div class="confirm-card print-card">
+      <h3 id="notice-title">—</h3>
+      <p id="notice-text">—</p>
+      <div class="pr-grid" style="grid-template-columns: 1fr 1fr;">
+        <label class="pr-f wide"><span>School Name (required)</span><input id="notice-school" placeholder="School name" autocomplete="organization"></label>
+        <label class="pr-f"><span>Class Size (required)</span><input id="notice-size" placeholder="Number of students" inputmode="numeric"></label>
+        <label class="pr-f"><span>Grade (optional)</span><input id="notice-grade" placeholder="Grade or grade range"></label>
+        <label class="pr-f wide" style="flex-direction: row; align-items: center; gap: 8px; cursor: pointer;"><input id="notice-after" type="checkbox" style="width: auto;"> This is an after-school program (optional)</label>
+      </div>
+      <div class="err" id="notice-err"></div>
+      <div class="confirm-row">
+        <button id="notice-ok">Submit and continue</button>
       </div>
     </div>
   </div>
@@ -1119,7 +1406,30 @@
         blobs.set(hash, { bytes, mime: info.mime });
       }
 
-      const story = await SproutSync.rehydrate(manifest.story, blobs);
+      // fmt 2 keeps each page outside the manifest (see splitPages in
+      // sprout-sync.js). Pages already on this disk are never downloaded again,
+      // so a child's small edit costs one page here, not the whole book.
+      let manifestStory = manifest.story;
+      if (manifest.fmt === 2) {
+        const pagesDir = await dir(T.root, 'pages');
+        const pages = new Map();
+        for (const [hash, info] of Object.entries(manifest.pages || {})) {
+          const fname = hash + '.json';
+          if (await fileExists(pagesDir, fname)) {
+            const f = await (await pagesDir.getFileHandle(fname)).getFile();
+            pages.set(hash, new Uint8Array(await f.arrayBuffer()));
+            continue;
+          }
+          const pres = await relay('/sync/page/' + info.id, { auth: keys.authToken });
+          if (!pres.ok) throw new Error('a page is missing — will retry');   // torn state; abort, don't write
+          const bytes = await SproutSync.decrypt(keys.encKey, new Uint8Array(await pres.arrayBuffer()));
+          await writeBytes(pagesDir, fname, bytes);
+          pages.set(hash, bytes);
+        }
+        manifestStory = SproutSync.joinPages(manifest.story, manifest.pageOrder, pages);
+      }
+
+      const story = await SproutSync.rehydrate(manifestStory, blobs);
 
       const teamsDir = await dir(T.root, 'teams');
       const tDir = await dir(teamsDir, team.teamName);
@@ -1128,7 +1438,8 @@
       // straight in the Studio with no extra steps.
       await writeJson(tDir, 'latest.json', story);
 
-      // Snapshots keep the REF form instead — a few KB each, sharing images/. Writing
+      // Snapshots keep the REF form instead — a few KB each, sharing images/ (and
+      // pages/, for a manifest from a Studio that sends pages separately). Writing
       // the full 50MB story 12×/hour × 10 teams would be gigabytes a day.
       const snapDir = await dir(tDir, 'snapshots');
       const stamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -1165,6 +1476,10 @@
 
       const needed = new Set();
       for (const t of collected) for (const h of t.blobHashes) needed.add(h);
+      // Pages hold the children's words, so a deleted team's must not linger in
+      // pages/ after the teacher was told its stories are gone. Every collect
+      // writes a snapshot, so the snapshots name every page still in use.
+      const neededPages = new Set();
 
       /* Snapshots reference images too — that is the whole point of keeping them,
          and each one is only a few KB precisely BECAUSE it shares images/ rather
@@ -1191,6 +1506,7 @@
             if (fh.kind !== 'file' || !fname.endsWith('.json')) continue;
             const manifest = JSON.parse(await (await fh.getFile()).text());
             for (const h of Object.keys(manifest.blobs || {})) needed.add(h);
+            for (const h of Object.keys(manifest.pages || {})) neededPages.add(h);
           }
         }
       } catch (e) {
@@ -1208,6 +1524,15 @@
       }
       for (const name of doomed) {
         try { await imagesDir.removeEntry(name); removed++; } catch {}
+      }
+
+      const pagesDir = await dir(T.root, 'pages');
+      const doomedPages = [];
+      for await (const [name, handle] of pagesDir.entries()) {
+        if (handle.kind === 'file' && !neededPages.has(name.replace(/\.json$/, ''))) doomedPages.push(name);
+      }
+      for (const name of doomedPages) {
+        try { await pagesDir.removeEntry(name); removed++; } catch {}
       }
       return removed;
     }
@@ -1259,6 +1584,7 @@
         await writeJson(T.root, 'class.json', T.klass);
         renderTeams();
         renderTierBar();   // every team just reported its real level — surface any drift
+        checkNotice();     // throttled to every ten minutes inside
 
         // Be precise about what "nothing new" means. The teacher can only ever
         // collect what a student has SENT — and students send a few seconds after
@@ -1359,10 +1685,14 @@
         <div class="team-title">${esc(rec.storyTitle || '—')}</div>
         <div class="team-meta"><span class="dot ${dot}"></span><span>${esc(meta)}</span></div>
         <div class="code hidden">Click to show the secret code</div>
-        <div class="team-actions"><button class="del-link">Delete team</button></div>
+        <div class="team-actions">${rec.lastRev ? '<button class="read-link">Read book</button><button class="print-link">Print book</button>' : ''}<button class="del-link">Delete team</button></div>
       </div>`;
 
         el.querySelector('.del-link').onclick = () => askDelete(team);
+        const printBtn = el.querySelector('.print-link');
+        if (printBtn) printBtn.onclick = () => openPrint(team);
+        const readBtn = el.querySelector('.read-link');
+        if (readBtn) readBtn.onclick = () => openBook(team);
 
         const img = el.querySelector('.team-thumb img');
         if (img) img.onclick = () => showLightbox(safeThumb, team.teamName + ' — ' + (rec.storyTitle || ''));
@@ -1680,7 +2010,7 @@
         const pruned = await pruneImages();
 
         log('deleted team ' + team.teamName + ' — ' + deleted + ' erased from the relay, '
-            + pruned + ' unused image(s) removed from this computer');
+            + pruned + ' unused image and page file(s) removed from this computer');
         closeDelete();
         renderTeams();
       } catch (e) {
@@ -1688,6 +2018,336 @@
       } finally {
         btn.textContent = 'Delete forever';
         btn.disabled = false;
+      }
+    }
+
+    /* ── reading a collected book ────────────────────────────────────────────
+       The whole book, every page in order, drawn from the copy on this disk by
+       the same code that draws the printed one (sprout-book.js).
+       ─────────────────────────────────────────────────────────────────────── */
+
+    async function loadCollected(team) {
+      try {
+        const tDir = await (await dir(T.root, 'teams')).getDirectoryHandle(team.teamName);
+        return await readJson(tDir, 'latest.json');
+      } catch { return null; }
+    }
+
+    const BOOK = { urls: [], at: 0, seq: 0 };
+
+    async function openBook(team) {
+      hideErr('class-err');
+      const story = await loadCollected(team);
+      if (!story || !(story.slides || []).length) {
+        showErr('class-err', 'Nothing collected for ' + team.teamName + ' yet, so there is no book to read.');
+        return;
+      }
+      closeBook();
+      const seq = BOOK.seq;
+      $('book-title').textContent = (story.title || 'Untitled') + ' · ' + team.teamName;
+      $('book-page').removeAttribute('src');
+      $('book-prev').disabled = $('book-next').disabled = true;
+      $('book-back').classList.add('open');
+      try {
+        const pages = await SproutBook.renderPages(story, {
+          longPx: 1600,
+          onPage: (i) => { if (seq === BOOK.seq) $('book-count').textContent = `Drawing page ${i + 1} of ${story.slides.length}…`; },
+        });
+        if (seq !== BOOK.seq) return;            // closed, or another book opened, while drawing
+        BOOK.urls = pages.map(p => URL.createObjectURL(p.blob));
+        showBookPage(0);
+      } catch (e) {
+        if (seq === BOOK.seq) $('book-count').textContent = 'Could not draw this book: ' + e.message;
+      }
+    }
+
+    function showBookPage(i) {
+      if (!BOOK.urls.length) return;
+      BOOK.at = Math.max(0, Math.min(BOOK.urls.length - 1, i));
+      $('book-page').src = BOOK.urls[BOOK.at];
+      $('book-count').textContent = `Page ${BOOK.at + 1} of ${BOOK.urls.length}`;
+      $('book-prev').disabled = BOOK.at === 0;
+      $('book-next').disabled = BOOK.at === BOOK.urls.length - 1;
+    }
+
+    function closeBook() {
+      $('book-back').classList.remove('open');
+      BOOK.urls.forEach(u => URL.revokeObjectURL(u));
+      BOOK.urls = [];
+      BOOK.seq++;
+    }
+
+    /* ── printed books ───────────────────────────────────────────────────────
+       The book is built HERE, from the decrypted story already on this disk:
+       nowhere else holds a readable copy (see sprout-book.js). The Worker
+       emails it to the StorySprout team, who order it from Staples, and does
+       not keep it.
+
+       Allowances are counted by the Worker, per teacher per school and per
+       school, so they follow the teacher's Google account to any computer.
+       See PRINTED BOOKS in pip-worker.js for the rules.
+       ─────────────────────────────────────────────────────────────────────── */
+
+    const SHIP_FIELDS = ['name', 'school', 'line1', 'line2', 'city', 'state', 'zip', 'phone'];
+    let pendingPrint = null;      // { team, story }
+    let printAllow = null;        // the Worker's last answer for the school in the form
+    let allowSeq = 0;
+
+    async function openPrint(team) {
+      hideErr('pr-err');
+      hideErr('class-err');
+      const story = await loadCollected(team);
+      if (!story || !(story.slides || []).length) {
+        showErr('class-err', 'Nothing collected for ' + team.teamName + ' yet, so there is no book to print.');
+        return;
+      }
+      pendingPrint = { team, story };
+
+      const n = story.slides.length;
+      $('pr-title').textContent = story.title || 'Untitled';
+      $('pr-pages').textContent = n + ' page' + (n === 1 ? '' : 's') + ' · ' + SproutBook.trim(story).label;
+      // Remembered in teacher.json from the last order, so a repeat order is one click.
+      const ship = T.teacher.shipTo || {};
+      for (const k of SHIP_FIELDS) $('pr-' + k).value = ship[k] || '';
+      const cls = T.teacher.printClass || {};
+      $('pr-grades').value = cls.grades || '';
+      $('pr-class').value = cls.classSize || '';
+      $('pr-copies').value = 1;
+      $('pr-reason').value = '';
+      $('pr-quota').textContent = '';
+      $('pr-quota').className = 'pr-quota';
+      $('pr-go').textContent = 'Send order';
+      printAllow = null;
+      renderAllowance();
+      $('print-back').classList.add('open');
+
+      if (!T.idToken) {
+        showErr('pr-err', 'Printed books need a Google sign-in. Use “Switch” at the top and sign in with Google.');
+        return;
+      }
+      await refreshAllowance();
+    }
+
+    function closePrint() {
+      $('print-back').classList.remove('open');
+      pendingPrint = null;
+    }
+
+    function printSchool() {
+      return { school: $('pr-school').value.trim(), zip: $('pr-zip').value.trim() };
+    }
+
+    async function printCall(path, body) {
+      const res = await fetch(WORKER + path, {
+        method: 'POST',
+        headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      return { res, out: await res.json() };
+    }
+
+    // The allowance belongs to a school, so it is asked for whenever the school
+    // name or ZIP changes.
+    async function refreshAllowance() {
+      hideErr('pr-err');
+      const s = printSchool();
+      const seq = ++allowSeq;
+      printAllow = null;
+      renderAllowance();
+      if (!T.idToken || !s.school || !/\d{5}/.test(s.zip)) return;
+      $('pr-allow-teacher').textContent = 'Checking your books…';
+      try {
+        const { res, out } = await printCall('/print/quota', s);
+        if (seq !== allowSeq) return;
+        if (!res.ok) throw new Error(out.error || 'could not check your books');
+        printAllow = out;
+      } catch (e) {
+        if (seq !== allowSeq) return;
+        showErr('pr-err', e.message);
+      }
+      renderAllowance();
+    }
+
+    function renderAllowance() {
+      const a = printAllow;
+      const books = (k) => k + ' book' + (k === 1 ? '' : 's');
+      $('pr-raise').classList.toggle('hide', !(a && a.canRaise));
+      $('pr-more').classList.toggle('hide', !(a && a.remaining === 0 && !a.canRaise));
+      $('pr-go').disabled = !(a && a.remaining > 0) || $('pr-go').textContent === 'Sent';
+      if (!a) {
+        $('pr-allow-teacher').textContent = 'Enter the school name and ZIP to see your books.';
+        $('pr-allow-school').textContent = '';
+        return;
+      }
+      $('pr-allow-teacher').textContent = `You: ${a.teacher.used} of ${books(a.teacher.limit)} used, ${a.teacher.remaining} left.`;
+      $('pr-allow-school').textContent = `Your school, all teachers together: ${a.school.used} of ${a.school.limit} used, ${a.school.remaining} left.`;
+      $('pr-copies').max = Math.max(1, a.remaining);
+
+      // Past 6 the way up is a person, by email, and never past the school's 10.
+      const schoolFull = a.school.remaining === 0;
+      $('pr-more-text').textContent = schoolFull
+        ? `Your school has used all ${a.school.limit} of its printed books.`
+        : 'Need more than this? We can arrange an increase, up to the school limit.';
+      const mail = $('pr-more-mail');
+      mail.classList.toggle('hide', schoolFull);
+      if (a.contact) {
+        mail.href = 'mailto:' + a.contact + '?subject=' + encodeURIComponent('More printed books') +
+          '&body=' + encodeURIComponent(`School: ${$('pr-school').value}\nZIP: ${$('pr-zip').value}\n\nWe would like more printed books because: `);
+        mail.textContent = 'Email ' + a.contact;
+      } else {
+        mail.removeAttribute('href');
+        mail.textContent = 'Email StorySprout';
+      }
+    }
+
+    async function doRaise() {
+      hideErr('pr-err');
+      const reason = $('pr-reason').value.trim();
+      if (reason.length < 10) { showErr('pr-err', 'Tell us a little about what the extra books are for.'); return; }
+      $('pr-raise-go').disabled = true;
+      try {
+        const { res, out } = await printCall('/print/raise', { ...printSchool(), reason });
+        if (!res.ok) throw new Error(out.error || 'could not raise your allowance');
+        printAllow = out;
+        renderAllowance();
+        log('printed-book allowance raised to ' + out.teacher.limit);
+      } catch (e) {
+        showErr('pr-err', e.message);
+      } finally {
+        $('pr-raise-go').disabled = false;
+      }
+    }
+
+    async function doPrint() {
+      const job = pendingPrint;
+      if (!job) return;
+      hideErr('pr-err');
+
+      const shipTo = {};
+      for (const k of SHIP_FIELDS) shipTo[k] = $('pr-' + k).value.trim();
+      const grades = $('pr-grades').value.trim();
+      const classSize = parseInt($('pr-class').value, 10);
+      const copies = parseInt($('pr-copies').value, 10);
+      if (!shipTo.name || !shipTo.school || !shipTo.line1 || !shipTo.city || !shipTo.state || !shipTo.zip) {
+        showErr('pr-err', 'Please fill in the recipient, the school and the full mailing address.');
+        return;
+      }
+      if (!grades) { showErr('pr-err', 'Please say which grades the students are in.'); return; }
+      if (!(classSize >= 1)) { showErr('pr-err', 'Please enter the class size.'); return; }
+      if (!(copies >= 1)) { showErr('pr-err', 'Choose how many copies.'); return; }
+      if (printAllow && copies > printAllow.remaining) {
+        showErr('pr-err', `You can order ${printAllow.remaining} more cop${printAllow.remaining === 1 ? 'y' : 'ies'}.`);
+        return;
+      }
+
+      const btn = $('pr-go');
+      btn.disabled = true;
+      try {
+        T.teacher.shipTo = shipTo;
+        T.teacher.printClass = { grades, classSize };
+        await writeJson(T.root, 'teacher.json', T.teacher);
+
+        const { pdf, pages, trim } = await SproutBook.storyPdf(job.story, (i) => {
+          btn.textContent = `Preparing page ${i + 1} of ${job.story.slides.length}…`;
+        });
+        btn.textContent = 'Sending…';
+
+        const { res, out } = await printCall('/print/order', {
+          title: job.story.title || 'Untitled',
+          teamName: job.team.teamName,
+          pages,
+          trim: trim.label,
+          copies, grades, classSize, shipTo,
+          pdf: await SproutBook.blobToBase64(pdf),
+        });
+        if (out.error === 'quota') {
+          printAllow = out;
+          renderAllowance();
+          throw new Error('There are not enough books left for that many copies.');
+        }
+        if (!res.ok) throw new Error(out.error || 'the order could not be sent');
+
+        btn.textContent = 'Sent';
+        printAllow = out;
+        renderAllowance();
+        $('pr-quota').className = 'pr-quota pr-done';
+        $('pr-quota').textContent = `Order ${out.orderId} sent. The StorySprout team will be in touch by email.`;
+        log('print order ' + out.orderId + ' sent for ' + job.team.teamName + ' (' + copies + ' cop' + (copies === 1 ? 'y' : 'ies') + ')');
+      } catch (e) {
+        showErr('pr-err', e.message);
+        btn.textContent = 'Send order';
+        btn.disabled = !(printAllow && printAllow.remaining > 0);
+      }
+    }
+
+    /* ── the one-time usage notice ───────────────────────────────────────────
+       When a school's network passes 1,000 requests, a class computer's student
+       is never shown the notice: the Worker notes the team, and this page shows
+       it to the signed-in teacher instead (USAGE NOTICE in pip-worker.js). Asked
+       on opening the class and then every ten minutes, not on every collect.
+       ─────────────────────────────────────────────────────────────────────── */
+    const NOTICE_EVERY_MS = 10 * 60 * 1000;
+    let noticeCheckedAt = 0;
+
+    async function teamTokens() {
+      const out = [];
+      for (const team of T.teacher?.teams || []) {
+        out.push((await SproutSync.deriveKeys(team.teamName, team.secretCode)).authToken);
+      }
+      return out;
+    }
+
+    async function checkNotice() {
+      if (!T.teacher?.teams?.length || (!T.idToken && !T.pass)) return;
+      if (Date.now() - noticeCheckedAt < NOTICE_EVERY_MS) return;
+      noticeCheckedAt = Date.now();
+      try {
+        const res = await fetch(WORKER + '/notice/teams', {
+          method: 'POST',
+          headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authTokens: await teamTokens() }),
+        });
+        const { notice } = await res.json();
+        if (!res.ok || !notice) return;
+        $('notice-title').textContent = notice.title;
+        $('notice-text').textContent = notice.text;
+        // Prefilled from the last print order, if there was one.
+        $('notice-school').value ||= T.teacher.shipTo?.school || '';
+        $('notice-size').value ||= T.teacher.printClass?.classSize || '';
+        $('notice-grade').value ||= T.teacher.printClass?.grades || '';
+        $('notice-back').classList.add('open');
+      } catch (e) {
+        log('could not check for notices: ' + e.message);
+      }
+    }
+
+    // Stays open until the answers are sent; the Worker records the notice as
+    // shown only when they arrive, so it never comes back for this network.
+    async function closeNotice() {
+      const survey = {
+        school: $('notice-school').value.trim(),
+        classSize: Number($('notice-size').value),
+        grade: $('notice-grade').value.trim(),
+        afterSchool: $('notice-after').checked,
+      };
+      if (!survey.school) return showErr('notice-err', 'Please enter the school name.');
+      if (!Number.isInteger(survey.classSize) || survey.classSize < 1 || survey.classSize > 1000) {
+        return showErr('notice-err', 'Please enter the class size as a number.');
+      }
+      hideErr('notice-err');
+      $('notice-ok').disabled = true;
+      try {
+        const res = await fetch(WORKER + '/notice/teams/ack', {
+          method: 'POST',
+          headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ authTokens: await teamTokens(), survey }),
+        });
+        if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'HTTP ' + res.status);
+        $('notice-back').classList.remove('open');
+      } catch (e) {
+        showErr('notice-err', 'Could not send that: ' + e.message);
+      } finally {
+        $('notice-ok').disabled = false;
       }
     }
 
@@ -1798,14 +2458,34 @@
       renderSignIn();
     });
 
+    // Opened inside the Studio (an overlay over the child's story). Closing asks
+    // the Studio to take this frame away; the story underneath never left memory.
+    if (new URLSearchParams(location.search).has('embedded') && window.parent !== window) {
+      document.body.classList.add('embedded');
+      $('back-to-studio').onclick = () => window.parent.postMessage({ type: 'sprout-teacher-close' }, location.origin);
+    }
+
     $('pick-folder').onclick = pickFolder;
     $('switch-signin').onclick = switchSignIn;
     $('new-team').onclick = newTeam;
     $('del-cancel').onclick = closeDelete;
     $('del-go').onclick = doDelete;
+    $('pr-cancel').onclick = closePrint;
+    $('pr-go').onclick = doPrint;
+    $('pr-raise-go').onclick = doRaise;
+    $('pr-school').onchange = refreshAllowance;
+    $('pr-zip').onchange = refreshAllowance;
+    $('book-prev').onclick = () => showBookPage(BOOK.at - 1);
+    $('book-next').onclick = () => showBookPage(BOOK.at + 1);
+    $('book-close').onclick = closeBook;
+    $('notice-ok').onclick = closeNotice;
     $('lightbox').onclick = () => $('lightbox').classList.remove('open');
     document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape') $('lightbox').classList.remove('open');
+      if (e.key === 'Escape') { $('lightbox').classList.remove('open'); closeBook(); }
+      if ($('book-back').classList.contains('open')) {
+        if (e.key === 'ArrowLeft') showBookPage(BOOK.at - 1);
+        if (e.key === 'ArrowRight') showBookPage(BOOK.at + 1);
+      }
     });
 
     // The button stays dead until the name matches exactly. Case-insensitive, so

@@ -25,7 +25,7 @@
 <button id="run">Run tests</button>
 <div id="out"></div>
 
-<script src="sprout-sync.js?v=1"></script>
+<script src="sprout-sync.js?v=2"></script>
 <script>
 const out = document.getElementById('out');
 let failures = 0;
@@ -244,6 +244,37 @@ document.getElementById('run').onclick = async () => {
     const rt = JSON.parse(new TextDecoder().decode(await S.decrypt(keys.encKey, enveloped)));
     const rtStory = await S.rehydrate(rt, blobs);
     check(JSON.stringify(rtStory) === originalJson, 'FULL ROUND TRIP: shred->gzip->encrypt->decrypt->gunzip->rehydrate === original');
+
+    /* ─────────────────────────────────────────────────────────── */
+    head('8. Pages split out of the manifest  (send only what changed)');
+    const split = await S.splitPages(manifestStory);
+    const skeletonJson = JSON.stringify(split.skeleton);
+    info('manifest without pages = ' + kb(skeletonJson.length) + ', ' + split.pages.size + ' page object(s)');
+    check(!('slides' in split.skeleton), 'the skeleton carries no slides');
+    check(split.order.length === (manifestStory.slides || []).length, 'one hash per page, in page order');
+    const joined = S.joinPages(split.skeleton, split.order, split.pages);
+    check(JSON.stringify(await S.rehydrate(joined, blobs)) === originalJson, 'rehydrate(join(split(strip(story)))) is BYTE-IDENTICAL to the original');
+
+    // One page edited: exactly that page's hash changes.
+    const edited = JSON.parse(JSON.stringify(manifestStory));
+    edited.slides[1].thumb = 'data:image/jpeg;base64,EDITED';
+    const split2 = await S.splitPages(edited);
+    const changed = split2.order.filter((h, i) => h !== split.order[i]).length;
+    check(changed === 1, 'editing one page changes one page hash (' + changed + ')');
+
+    // Reordered: no new hashes at all, only a new order.
+    const swapped = JSON.parse(JSON.stringify(manifestStory));
+    swapped.slides.reverse();
+    const split3 = await S.splitPages(swapped);
+    check(split3.order.every(h => split.pages.has(h)) && split3.order.join() === [...split.order].reverse().join(), 'reordering pages needs no new page objects');
+
+    const pid = await S.pageIdFor(keys.blobKey, split.order[0]);
+    check(pid !== await S.blobIdFor(keys.blobKey, split.order[0]), 'a page id never equals a blob id for the same hash');
+
+    let missingPage = false;
+    try { S.joinPages(split.skeleton, split.order, new Map()); }
+    catch (e) { missingPage = (e.code === 'MISSING_PAGE'); }
+    check(missingPage, 'a missing page raises MISSING_PAGE');
 
   } catch (e) {
     bad('EXCEPTION: ' + (e && e.stack ? e.stack : e));
