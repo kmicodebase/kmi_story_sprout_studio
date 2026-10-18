@@ -14,6 +14,7 @@ It also has a **Teacher Mode**: a teacher collects every child's work onto their
 |---|---|
 | `workshop-plugin.html` | **The app.** ~3,900 lines, single file. This is what you almost always want. |
 | `teacher.html` | Teacher Mode dashboard — create teams, collect student work. |
+| `admin.html` | StorySprout's admin page — every teacher account, team record, order and survey answer; switches printing on per teacher. |
 | `sprout-sync.js` | Shared crypto + content-addressing + relay client. Loaded by **both** pages. |
 | `sprout-sync-test.html` | Test harness for the above. Open it, click *Run tests*. |
 | `sprout-book.js` | Draws a story's pages and builds the PDF. Loaded by **both** pages: the Studio's book preview/PDF/print and the teacher's book viewer and print orders. Needs Fabric. |
@@ -49,7 +50,7 @@ Browser app → **Cloudflare Worker** (`https://storysprout-pip.jackwangxyw.work
   default differs per model — so `handleChat` states `'low'` explicitly. Swapping
   the chat model is **not** a one-line change; read `handleChat` first. The
   measured comparison that picked it is in a comment right there.
-- Worker routes: `/chat`, `/image`, `/image-edit`, `/sync/*` for Teacher Mode, `/print/*` for printed books (rules in the PRINTED BOOKS block), and `/notice*` for the one-time 1,000-request class survey (USAGE NOTICE block; answers are stored in R2 under `survey/`).
+- Worker routes: `/chat`, `/image`, `/image-edit`, `/sync/*` for Teacher Mode, `/print/*` for printed books (rules in the PRINTED BOOKS block), `/notice*` for the one-time 1,000-request class survey (USAGE NOTICE block; answers are stored in R2 under `survey/`), and `/account*` + `/admin/*` for teacher accounts and `admin.html` (TEACHER ACCOUNTS block). A Google sign-in needs an account (`teachers/` in R2) to make a team, and an admin-approved one to print.
 - The Worker is deployed by **pasting it into the Cloudflare dashboard** — no wrangler, no bundler, so it must stay a single dependency-free file. The repo copy and the deployed copy drift easily; the repo is the source of truth.
 - The site is served from GitHub Pages at `https://kmicodebase.github.io/kmi_story_sprout_studio/`.
 

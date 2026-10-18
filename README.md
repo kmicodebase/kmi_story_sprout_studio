@@ -173,7 +173,8 @@ Class folder/
 **Cloudflare** (same Worker as Pip — the sync routes live alongside `/chat` and `/image`):
 1. **R2 → Create bucket**, then **Worker → Settings → Bindings → R2 bucket**, variable name `SPROUT_BUCKET`.
 2. Add a secret `TEACHER_PASSPHRASE` — long and random. This is the fallback sign-in.
-3. *(Optional, for Google sign-in)* add plain var `GOOGLE_CLIENT_ID`. Any verified Google account can then sign in as a teacher; each team belongs to the teacher who made it. `ALLOWED_TEACHER_EMAILS` is now optional and only says who may claim a team created before teams had owners.
+3. *(Optional, for Google sign-in)* add plain var `GOOGLE_CLIENT_ID`. Any verified Google account can then sign in; the first time, it fills in a teacher account (name, school, ZIP, grades) before it can make a team, and the operator gets an email. Each team belongs to the teacher who made it. `ALLOWED_TEACHER_EMAILS` is now optional and only says who may claim a team created before teams had owners.
+   - **Admin page:** [`admin.html`](https://kmicodebase.github.io/kmi_story_sprout_studio/admin.html) lists every teacher, team, print order and survey answer, and is where printing is switched on per teacher (it is off for every new account). Open to the Google accounts in plain var `ADMIN_EMAILS` (default kmi.aistorybooks@gmail.com) and to the passphrase. It never shows a story: those are encrypted with keys the Worker never has.
 4. *(Optional, for printed books)* add secret `RESEND_API_KEY`. Orders go to kmi.aistorybooks@gmail.com; plain var `PRINT_ORDER_EMAIL` sends them elsewhere (another inbox, or a Staples print centre that takes orders by email). `PRINT_FROM_EMAIL` sets the sender (default is Resend's shared test sender, which only delivers to the Resend account's own address). `CONTACT_EMAIL` is the address teachers are shown when they want more than 6 books; it falls back to `PRINT_ORDER_EMAIL`. Allowances are lifetime and counted in copies: 3 per teacher per school, raised once to 6 when the teacher says what more are for, and never more than 10 per school across all its teachers. `PRINT_LIMIT_OVERRIDES` raises one teacher's limit, e.g. `teacher@school.org=8`; the school's 10 still applies.
 
 **Google sign-in** (optional — the passphrase alone works fine): create an OAuth **Web application** client in Google Cloud. Authorized JavaScript origins must include `https://kmicodebase.github.io` **and** `http://localhost:8000`; leave redirect URIs empty. Paste the client ID into `GOOGLE_CLIENT_ID` in `teacher.html` (client IDs are public — safe to commit). This list is **separate** from the Worker's `ALLOWED_ORIGINS` — see [Three allowlists](#3-three-allowlists-three-different-places). For anyone to sign in, the OAuth consent screen must be **published** (In production), not in Testing, where only listed test users can.
@@ -189,6 +190,7 @@ Class folder/
 | `index.html` | Entry point — redirects to the current app |
 | `workshop-plugin.html` | **The app** — Pip, the conversational illustrator |
 | `teacher.html` | **Teacher Mode dashboard** — create teams, collect student work |
+| `admin.html` | StorySprout's admin page: every teacher account, team, order and survey answer; switches printing on per teacher |
 | `sprout-sync.js` | Shared crypto + content-addressing + relay client (used by **both** pages) |
 | `sprout-book.js` | Shared page renderer and PDF builder: the Studio's book preview and PDF, the teacher's book viewer and print orders |
 | `sprout-sync-test.html` | Test harness for the above — open it and click *Run tests* |
@@ -254,7 +256,9 @@ The Worker exposes:
 | `POST /sync/blobs/check` | `{ ids[] } → { missing[] }`, so a routine sync is two requests, not twenty |
 | `GET · PUT /sync/blob/<id>` | An encrypted image. Immutable, content-addressed. |
 | `POST /sync/pages/check` · `GET · PUT /sync/page/<id>` | Encrypted pages, the same way. A page no push has used for a day is deleted. |
-| `POST /print/quota` · `/print/raise` · `/print/order` | Teacher only (Google). Printed-book allowance, the one-time raise to 6, and the order email. |
+| `POST /print/quota` · `/print/raise` · `/print/order` | Teacher only (Google). Printed-book allowance, the one-time raise to 6, and the order email. Raising and ordering need an account the admin approved. |
+| `POST /account` · `/account/signup` | Teacher (Google): the teacher account, or `null` so the page shows the sign-up form. Stored in R2 under `teachers/` |
+| `POST /admin/data` · `/admin/approve` | Admin only: everything `admin.html` shows, and switching printing on or off for an account |
 | `GET /notice` · `POST /notice/ack` · `/notice/teams` · `/notice/teams/ack` | The one-time "Help us improve Story Sprout" form when a network passes 1,000 requests. Answers land in R2 under `survey/` |
 | `GET · PUT /sync/assign` | The teacher's assignment — its own object, so it can't race a student's push |
 

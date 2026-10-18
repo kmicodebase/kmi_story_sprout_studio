@@ -30,8 +30,14 @@
 //
 //   Printed books (see the PRINTED BOOKS block). All teacher only:
 //   POST /print/quota       — { school, zip } -> the teacher's and the school's allowance
-//   POST /print/raise       — { school, zip, reason } -> raises 3 to 6, once
-//   POST /print/order       — emails the operator the PDF, address and class details
+//   POST /print/raise       — { school, zip, reason } -> raises 3 to 6, once (approved accounts)
+//   POST /print/order       — emails the operator the PDF, address and class details (approved accounts)
+//
+//   Teacher accounts (see the TEACHER ACCOUNTS block):
+//   POST /account           — teacher: -> { account } or { account: null } (show the sign-up form)
+//   POST /account/signup    — teacher: { name, school, zip, grades } -> { account }
+//   POST /admin/data        — admin: every account, team record, order and survey
+//   POST /admin/approve     — admin: { id, approved } turns printing on or off for an account
 //
 //   Usage notice (see the USAGE NOTICE block):
 //   GET  /notice            — the notice text
@@ -48,7 +54,10 @@
 // Teacher sign-in — configure EITHER or BOTH (both is recommended: the passphrase
 // means a broken OAuth config can't lock a teacher out mid-lesson):
 //   GOOGLE_CLIENT_ID       — plain var; the OAuth Web client ID from Google Cloud.
-//                            Any verified Google account can sign in as a teacher.
+//                            Any verified Google account can sign in, then signs
+//                            up (name, school) before it can make a team.
+//   ADMIN_EMAILS           — plain var, optional. Who may use admin.html. Defaults
+//                            to kmi.aistorybooks@gmail.com.
 //   ALLOWED_TEACHER_EMAILS — plain var, optional. NOT a sign-in allowlist any more:
 //                            only who may claim a team created before teams had
 //                            owners. See authorizeTeam().
@@ -797,6 +806,18 @@ function makeStore(env) {
       } while (cursor);
       return keys;
     },
+    // The "folders" one level under a prefix (each team's t/<key>/), without
+    // walking every image and page inside them.
+    async listPrefixes(prefix) {
+      const out = [];
+      let cursor;
+      do {
+        const r = await bucket.list({ prefix, delimiter: '/', cursor });
+        out.push(...(r.delimitedPrefixes || []));
+        cursor = r.truncated ? r.cursor : null;
+      } while (cursor);
+      return out;
+    },
   };
 }
 
@@ -912,7 +933,9 @@ function constantTimeEqual(a, b) {
 //   - a team is bound to the teacher who created it (meta.owner), so a student
 //     signing in with their own school Google account cannot touch their
 //     class's level or delete it, even though they know the team token;
-//   - every print order is emailed to a human who places it by hand.
+//   - every print order is emailed to a human who places it by hand, and only
+//     an account StorySprout approved can order (TEACHER ACCOUNTS block).
+// Making a team also needs a filled-in account, but anyone can fill one in.
 //
 // `id` is a hash of Google's opaque account id (`sub`), never the email, so
 // the plaintext meta.json still holds nothing that names a person.
@@ -1027,6 +1050,7 @@ async function handleSync(path, request, env) {
       // The only thing kept about the teacher is verifyTeacher's opaque `id`,
       // recorded as the team's owner — see authorizeTeam.
       const who = await verifyTeacher(request, env);
+      await requireAccount(store, who);
 
       const { authToken, tier } = await request.json();
       const objectKey = await objectKeyFor(authToken);
@@ -1408,11 +1432,17 @@ async function handleSync(path, request, env) {
      CONTACT_EMAIL         optional. Where a teacher who wants more than 6 is
                            told to write. Falls back to PRINT_ORDER_EMAIL.
 
-   Storage (no address, no book):
+   APPROVAL. Only an account StorySprout has approved on the admin page can
+   raise or order (TEACHER ACCOUNTS block). /print/quota answers either way,
+   with `approved`, so the page can say why the button is off.
+
+   Storage (no book):
      print/teacher/<hash of teacher id + school>.json
          { used, limit, raised: { at, reason }?, orders: [{ id, at, copies }] }
      print/school/<hash of school>.json
          { used, orders: [{ id, at, copies }] }
+     orders/<order id>.json
+         the whole order, address included, for the admin page
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const PRINT_BASE_LIMIT   = 3;
@@ -1498,7 +1528,7 @@ async function giveBack(store, key, orderId) {
   }
 }
 
-async function sendOrderEmail(env, { orderId, who, order, pdfBase64, allowance, raised }) {
+async function sendOrderEmail(env, { orderId, who, acct, order, pdfBase64, allowance, raised }) {
   const s = order.shipTo;
   const text = [
     `New StorySprout print order ${orderId}: ${order.copies} cop${order.copies === 1 ? 'y' : 'ies'}`,
@@ -1509,7 +1539,7 @@ async function sendOrderEmail(env, { orderId, who, order, pdfBase64, allowance, 
     `Copies:      ${order.copies}`,
     `Team:        ${order.teamName}`,
     '',
-    `Teacher:     ${who.email}`,
+    `Teacher:     ${acct.name} <${who.email}>`,
     `School:      ${s.school}`,
     `Grades:      ${order.grades}`,
     `Class size:  ${order.classSize}`,
@@ -1558,13 +1588,20 @@ async function handlePrint(path, request, env) {
     const who = await verifyTeacher(request, env);
     // The allowance and the reply both hang off a real person's account.
     if (who.admin) throw httpError(403, 'Sign in with Google to order printed books.');
+    const acct = await requireAccount(store, who);
 
     const body = await request.json();
     const ship = body.shipTo || {};
     const { teacherKey, schoolKey } = await printKeys(who, body.school ?? ship.school, body.zip ?? ship.zip);
-    const allowance = async () => printAllowance(await store.getJson(teacherKey), await store.getJson(schoolKey), who, env);
+    const allowance = async () => ({
+      ...printAllowance(await store.getJson(teacherKey), await store.getJson(schoolKey), who, env),
+      approved: acct.printApproved === true,
+    });
 
     if (path === '/print/quota') return jsonResponse(await allowance());
+    if (acct.printApproved !== true) {
+      throw httpError(403, 'Printing is not switched on for your account yet. StorySprout will turn it on.');
+    }
 
     // From 3 to 6, once, with no human in the loop. What the teacher writes is
     // kept and goes out with every later order email.
@@ -1652,16 +1689,178 @@ async function handlePrint(path, request, env) {
         throw e;
       }
 
+      // The admin page's record of the order. Written before the email so a
+      // sent order is never missing from it; removed again if the email fails.
+      const logKey = `orders/${orderId}.json`;
+      await store.put(logKey, JSON.stringify({
+        ...order, id: orderId, at: entry.at, teacherId: who.id, email: who.email, teacherName: acct.name,
+      }), 'application/json');
+
       try {
-        await sendOrderEmail(env, { orderId, who, order, pdfBase64, allowance: await allowance(), raised: tRec.raised });
+        await sendOrderEmail(env, { orderId, who, acct, order, pdfBase64, allowance: await allowance(), raised: tRec.raised });
       } catch (err) {
         // The order never reached anyone, so it must not cost a copy.
         await giveBack(store, teacherKey, orderId);
         await giveBack(store, schoolKey, orderId);
+        await store.delete(logKey);
         throw err;
       }
 
       return jsonResponse({ orderId, ...(await allowance()) });
+    }
+
+    throw httpError(404, 'Not found: ' + request.method + ' ' + path);
+  } catch (err) {
+    return jsonResponse({ error: err.message }, err.status || 500);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEACHER ACCOUNTS — and the admin page that reads them.
+
+   Signing in with Google proves who someone is; an account is what makes them
+   a StorySprout teacher. The first Google sign-in on the teacher page asks for
+   a short profile and saves it here. There is no approval to get started, so a
+   teacher can make teams straight away, but nothing can make a team without
+   one. Printing costs real money, so it stays off for an account until
+   StorySprout approves it on admin.html. Each sign-up emails the operator so
+   they know to look.
+
+   Admins are the emails in ADMIN_EMAILS (default DEFAULT_ORDER_EMAIL), signed
+   in with Google, and the passphrase holder. Admin here means reading all of
+   this and approving printing. It does not reach into teams: that stays with
+   each team's owner and the passphrase.
+
+   The admin page sees every account, every team's plaintext meta.json (when it
+   was made, last synced, size, content level, owner), every order and every
+   survey. It never sees a story: those are encrypted with a key that never
+   reaches this Worker.
+
+   Storage: teachers/<who.id>.json
+     { id, email, name, school, zip, grades, createdAt, updatedAt,
+       printApproved, printApprovedAt? }
+   ═══════════════════════════════════════════════════════════════════════════ */
+const ADMIN_PAGE_URL = 'https://kmicodebase.github.io/kmi_story_sprout_studio/admin.html';
+const accountKey = (id) => `teachers/${id}.json`;
+
+// The account behind a Google sign-in, or a 403 that tells the teacher what to
+// do. The passphrase holder has no account and needs none.
+async function requireAccount(store, who) {
+  if (who.admin) return null;
+  const acct = await store.getJson(accountKey(who.id));
+  if (!acct) throw httpError(403, 'Finish signing up first: reload the teacher page and fill in the sign-up form.');
+  return acct;
+}
+
+async function verifyAdmin(request, env) {
+  const who = await verifyTeacher(request, env);
+  if (who.admin || emailList(env.ADMIN_EMAILS || DEFAULT_ORDER_EMAIL).includes(who.email)) return who;
+  throw httpError(403, 'This account is not a StorySprout admin.');
+}
+
+function readSignup(b) {
+  b = b || {};
+  const out = {
+    name:   field(b.name, 100),
+    school: field(b.school, 200),
+    zip:    (String(b.zip || '').match(/\d{5}/) || [''])[0],
+    grades: field(b.grades, 60),
+  };
+  if (!out.name) throw httpError(400, 'Please enter your name.');
+  if (!out.school) throw httpError(400, 'Please enter your school.');
+  if (!out.zip) throw httpError(400, 'Please enter the school\'s 5-digit ZIP code.');
+  return out;
+}
+
+async function sendSignupEmail(env, acct) {
+  if (!env.RESEND_API_KEY) return;
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from: env.PRINT_FROM_EMAIL || DEFAULT_FROM,
+      to: [orderEmail(env)],
+      reply_to: acct.email,
+      subject: `New teacher: ${acct.name}, ${acct.school}`,
+      text: [
+        `${acct.name} <${acct.email}> signed up as a StorySprout teacher.`,
+        '',
+        `School:  ${acct.school} ${acct.zip}`,
+        `Grades:  ${acct.grades || '(not given)'}`,
+        '',
+        'They can make teams now. Printing stays off until you approve it:',
+        ADMIN_PAGE_URL,
+      ].join('\n'),
+    }),
+  });
+  if (!res.ok) throw new Error(`Resend ${res.status}: ${(await res.text()).slice(0, 200)}`);
+}
+
+async function listJson(store, prefix) {
+  const keys = await store.list(prefix);
+  return (await Promise.all(keys.map(k => store.getJson(k)))).filter(Boolean);
+}
+
+async function handleAccount(path, request, env, ctx) {
+  try {
+    const store = makeStore(env);
+    const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+    if (isRegisterRateLimited(ip)) throw httpError(429, 'Too many attempts. Wait a minute.');
+    if (request.method !== 'POST') throw httpError(405, 'POST required.');
+
+    // The teacher page asks on every Google sign-in; null means show the form.
+    if (path === '/account') {
+      const who = await verifyTeacher(request, env);
+      if (who.admin) return jsonResponse({ account: null, passphrase: true });
+      return jsonResponse({ account: await store.getJson(accountKey(who.id)) });
+    }
+
+    // New account, or an edit to one. An edit keeps the approval and the date.
+    if (path === '/account/signup') {
+      const who = await verifyTeacher(request, env);
+      if (who.admin) throw httpError(403, 'Sign in with Google to make a teacher account.');
+      const profile = readSignup(await request.json().catch(() => ({})));
+      let created = false;
+      const acct = await updateRecord(store, accountKey(who.id), (cur) => {
+        created = !cur;
+        return {
+          printApproved: false, createdAt: Date.now(), ...cur,
+          ...profile, id: who.id, email: who.email, updatedAt: Date.now(),
+        };
+      });
+      // A failed notice must not fail the sign-up: the teacher would be locked
+      // out over an email to us, and the admin page lists the account anyway.
+      if (created) ctx.waitUntil(sendSignupEmail(env, acct).catch(e => console.error('sign-up email failed:', e.message)));
+      return jsonResponse({ account: acct });
+    }
+
+    if (path === '/admin/data') {
+      await verifyAdmin(request, env);
+      const teams = [];
+      for (const prefix of await store.listPrefixes('t/')) {
+        const m = await store.getJson(prefix + 'meta.json');
+        if (m) teams.push({
+          key: prefix.slice(2, -1), owner: m.owner || null, contentTier: m.contentTier || DEFAULT_TIER,
+          createdAt: m.createdAt || 0, updatedAt: m.updatedAt || 0, rev: m.rev || 0, bytes: m.bytes || 0, blobCount: m.blobCount || 0,
+        });
+      }
+      return jsonResponse({
+        teachers: await listJson(store, 'teachers/'),
+        teams,
+        orders: await listJson(store, 'orders/'),
+        surveys: await listJson(store, 'survey/'),
+      });
+    }
+
+    if (path === '/admin/approve') {
+      await verifyAdmin(request, env);
+      const { id, approved } = await request.json().catch(() => ({}));
+      if (!/^[0-9a-f]{64}$/.test(id || '')) throw httpError(400, 'Bad teacher id.');
+      const acct = await updateRecord(store, accountKey(id), (cur) => {
+        if (!cur) throw httpError(404, 'No such teacher.');
+        return { ...cur, printApproved: approved === true, printApprovedAt: approved === true ? Date.now() : null };
+      });
+      return jsonResponse({ account: acct });
     }
 
     throw httpError(404, 'Not found: ' + request.method + ' ' + path);
@@ -1849,6 +2048,9 @@ export default {
       }
       if (path === '/notice' || path.startsWith('/notice/')) {
         return withCors(await handleNotice(path, request, env), cors);
+      }
+      if (path === '/account' || path.startsWith('/account/') || path.startsWith('/admin/')) {
+        return withCors(await handleAccount(path, request, env, ctx), cors);
       }
 
       // ── AI routes ────────────────────────────────────────────────────────

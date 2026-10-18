@@ -751,7 +751,8 @@
       text-decoration: underline;
     }
 
-    #notice-back {
+    #notice-back,
+    #signup-back {
       position: fixed;
       inset: 0;
       z-index: 9300;
@@ -761,7 +762,8 @@
       justify-content: center;
     }
 
-    #notice-back.open {
+    #notice-back.open,
+    #signup-back.open {
       display: flex;
     }
 
@@ -1221,6 +1223,28 @@
     </div>
   </div>
 
+  <!-- First Google sign-in: the teacher account (TEACHER ACCOUNTS in pip-worker.js).
+       No way to close it without signing up; teams need an account. -->
+  <div id="signup-back">
+    <div class="confirm-card print-card">
+      <h3 style="color: var(--purple-dark)">Create your teacher account</h3>
+      <p>Welcome to StorySprout. Tell us who you are and where you teach. You can make teams for your
+        class as soon as this is done. Printed books are switched on once the StorySprout team has
+        checked your account.</p>
+      <div class="pr-grid" style="grid-template-columns: 1fr 1fr;">
+        <label class="pr-f wide"><span>Your name</span><input id="signup-name" placeholder="Your name" autocomplete="name"></label>
+        <label class="pr-f wide"><span>School name</span><input id="signup-school" placeholder="School name" autocomplete="organization"></label>
+        <label class="pr-f"><span>School ZIP</span><input id="signup-zip" placeholder="School ZIP" autocomplete="postal-code" inputmode="numeric"></label>
+        <label class="pr-f"><span>Grades you teach (optional)</span><input id="signup-grades" placeholder="e.g. 2–3"></label>
+      </div>
+      <p style="margin-top:10px">Signed in as <strong id="signup-email">—</strong>.</p>
+      <div class="err" id="signup-err"></div>
+      <div class="confirm-row">
+        <button id="signup-ok">Create account</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     /* ═══════════════════════════════════════════════════════════════════════════
        StorySprout Studio — Teacher dashboard
@@ -1261,6 +1285,7 @@
     const T = {
       idToken: null,     // Google ID token (primary)
       idTokenExp: 0,     // when it stops working, ms
+      account: null,     // the Worker's teacher account for this Google sign-in
       pass: null,        // teacher passphrase (fallback)
       email: null,
       root: null,        // FileSystemDirectoryHandle for the class folder
@@ -2110,9 +2135,10 @@
       $('pr-title').textContent = story.title || 'Untitled';
       $('pr-pages').textContent = n + ' page' + (n === 1 ? '' : 's') + ' · ' + SproutBook.trim(story).label;
       // Remembered in teacher.json from the last order, so a repeat order is one click.
-      const ship = T.teacher.shipTo || {};
+      // A first order starts from the school on the teacher's account.
+      const ship = T.teacher.shipTo || { school: T.account?.school, zip: T.account?.zip };
       for (const k of SHIP_FIELDS) $('pr-' + k).value = ship[k] || '';
-      const cls = T.teacher.printClass || {};
+      const cls = T.teacher.printClass || { grades: T.account?.grades };
       $('pr-grades').value = cls.grades || '';
       $('pr-class').value = cls.classSize || '';
       $('pr-copies').value = 1;
@@ -2185,6 +2211,17 @@
       $('pr-allow-teacher').textContent = `You: ${a.teacher.used} of ${books(a.teacher.limit)} used, ${a.teacher.remaining} left.`;
       $('pr-allow-school').textContent = `Your school, all teachers together: ${a.school.used} of ${a.school.limit} used, ${a.school.remaining} left.`;
       $('pr-copies').max = Math.max(1, a.remaining);
+
+      // The Worker refuses orders until StorySprout approves the account.
+      if (!a.approved) {
+        $('pr-go').disabled = true;
+        $('pr-raise').classList.add('hide');
+        $('pr-more').classList.add('hide');
+        $('pr-quota').className = 'pr-quota';
+        $('pr-quota').textContent = 'Printed books are not switched on for your account yet. The StorySprout ' +
+          'team has been told you signed up and will turn them on. Check back here.';
+        return;
+      }
 
       // Past 6 the way up is a person, by email, and never past the school's 10.
       const schoolFull = a.school.remaining === 0;
@@ -2415,9 +2452,63 @@
       T.idTokenExp = claims.exp * 1000;
       clearTimeout(renewTimer);
       renewTimer = setTimeout(renewGoogle, Math.max(0, T.idTokenExp - Date.now() - 5 * 60 * 1000));
+      const renewal = !!renewDone;
       renewDone?.();
       onSignedIn(claims.email);
+      if (!renewal) checkAccount(claims);
     };
+
+    // A Google sign-in with no teacher account gets the sign-up form, which only
+    // closes once the account exists. The Worker refuses teams without one, so a
+    // failed check here is reported, not worked around.
+    async function checkAccount(claims) {
+      try {
+        const res = await fetch(WORKER + '/account', {
+          method: 'POST',
+          headers: { ...(await teacherAuthHeader()), 'Content-Type': 'application/json' },
+          body: '{}',
+        });
+        const out = await res.json();
+        if (!res.ok) throw new Error(out.error || 'HTTP ' + res.status);
+        T.account = out.account;
+        if (T.account) return;
+        $('signup-email').textContent = claims.email;
+        $('signup-name').value ||= claims.name || '';
+        $('signup-back').classList.add('open');
+        $('signup-name').focus();
+      } catch (e) {
+        showErr('setup-err', 'Could not check your teacher account: ' + e.message);
+      }
+    }
+
+    async function submitSignup() {
+      const profile = {
+        name: $('signup-name').value.trim(),
+        school: $('signup-school').value.trim(),
+        zip: $('signup-zip').value.trim(),
+        grades: $('signup-grades').value.trim(),
+      };
+      if (!profile.name) return showErr('signup-err', 'Please enter your name.');
+      if (!profile.school) return showErr('signup-err', 'Please enter your school.');
+      if (!/\d{5}/.test(profile.zip)) return showErr('signup-err', 'Please enter the school\'s 5-digit ZIP code.');
+      hideErr('signup-err');
+      $('signup-ok').disabled = true;
+      try {
+        const res = await fetch(WORKER + '/account/signup', {
+          method: 'POST',
+          headers: { ...(await teacherAuthHeader()), 'Content-Type': 'application/json' },
+          body: JSON.stringify(profile),
+        });
+        const out = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(out.error || 'HTTP ' + res.status);
+        T.account = out.account;
+        $('signup-back').classList.remove('open');
+      } catch (e) {
+        showErr('signup-err', 'Could not create your account: ' + e.message);
+      } finally {
+        $('signup-ok').disabled = false;
+      }
+    }
 
     // The fallback. Verified lazily — we can't check a passphrase without asking
     // the Worker to do something, so the first "New team" is what confirms it.
@@ -2506,6 +2597,7 @@
     $('book-next').onclick = () => showBookPage(BOOK.at + 1);
     $('book-close').onclick = closeBook;
     $('notice-ok').onclick = closeNotice;
+    $('signup-ok').onclick = submitSignup;
     $('lightbox').onclick = () => $('lightbox').classList.remove('open');
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') { $('lightbox').classList.remove('open'); closeBook(); }

@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>StorySprout Studio — Admin</title>
+  <link href="vendor/fonts.css" rel="stylesheet">
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    :root {
+      --purple: #7c5cff;
+      --purple-dark: #5b3fd6;
+      --purple-bg: #f2eeff;
+      --cream: #faf8f5;
+      --white: #fff;
+      --ink: #2c2836;
+      --ink2: #5a5470;
+      --ink3: #918aa6;
+      --border: #e6e1f0;
+      --green: #38b48a;
+      --amber: #e0a03c;
+      --red: #e05c5c;
+      --radius: 16px;
+      --radius-sm: 10px;
+      --font: 'Nunito', system-ui, sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: var(--font);
+      background: var(--cream);
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    header {
+      background: var(--white);
+      border-bottom: 2px solid var(--border);
+      padding: 0 24px;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    header h1 { font-size: 17px; margin: 0; font-weight: 800; color: var(--purple-dark); }
+
+    .tag {
+      font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+      background: var(--purple-bg); color: var(--purple-dark); padding: 3px 8px; border-radius: 20px;
+    }
+
+    .spacer { flex: 1; }
+    #who { font-size: 12px; color: var(--ink3); }
+
+    main { max-width: 1280px; margin: 0 auto; padding: 24px 24px 60px; }
+
+    button {
+      font-family: var(--font); font-weight: 700; font-size: 13px; border: none;
+      border-radius: var(--radius-sm); padding: 8px 14px; cursor: pointer; background: var(--purple); color: #fff;
+    }
+    button:hover:not(:disabled) { background: var(--purple-dark); }
+    button:disabled { opacity: .5; cursor: default; }
+    button.ghost { background: var(--white); color: var(--ink2); border: 2px solid var(--border); }
+    button.small { padding: 4px 10px; font-size: 12px; }
+    .pass-link { background: none; color: var(--ink3); font-size: 12px; padding: 4px; text-decoration: underline; }
+    .pass-link:hover:not(:disabled) { background: none; color: var(--ink2); }
+
+    .panel {
+      background: var(--white); border: 2px solid var(--border); border-radius: var(--radius);
+      padding: 18px 20px; margin-bottom: 18px;
+    }
+    .panel h2 { font-size: 16px; margin: 0 0 4px; }
+    .panel > p { margin: 0 0 12px; color: var(--ink2); font-size: 13px; }
+
+    #signin { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+    .hide { display: none !important; }
+
+    .stats { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+    .stat { background: var(--white); border: 2px solid var(--border); border-radius: var(--radius-sm); padding: 10px 16px; }
+    .stat b { display: block; font-size: 22px; color: var(--purple-dark); }
+    .stat span { font-size: 12px; color: var(--ink2); }
+
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    th {
+      text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .05em;
+      color: var(--ink3); padding: 6px 8px; border-bottom: 2px solid var(--border); white-space: nowrap;
+    }
+    td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    td.num { text-align: right; white-space: nowrap; }
+    td.nowrap { white-space: nowrap; }
+    .muted { color: var(--ink3); }
+    .pill { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
+    .pill.on { background: #e3f6ee; color: var(--green); }
+    .pill.off { background: #fbf0dd; color: var(--amber); }
+    .empty { color: var(--ink3); padding: 8px 0; }
+
+    .err {
+      display: none; background: #fdeaea; color: var(--red); border-radius: var(--radius-sm);
+      padding: 10px 14px; margin: 10px 0; font-size: 13px; font-weight: 600;
+    }
+    .err.show { display: block; }
+
+    @media (max-width: 640px) {
+      header { padding: 0 16px; }
+      main { padding: 16px; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>StorySprout Studio</h1>
+    <span class="tag">Admin</span>
+    <div class="spacer"></div>
+    <span id="who"></span>
+    <button class="ghost small hide" id="refresh">Refresh</button>
+  </header>
+
+  <main>
+    <div class="panel" id="signin-panel">
+      <h2>Sign in</h2>
+      <p>Only StorySprout admins can open this page: the Google accounts in the Worker's ADMIN_EMAILS
+        (kmi.aistorybooks@gmail.com unless changed), or the teacher passphrase.</p>
+      <div id="signin"></div>
+    </div>
+    <div class="err" id="err"></div>
+
+    <div id="data" class="hide">
+      <div class="stats" id="stats"></div>
+
+      <div class="panel">
+        <h2>Teachers</h2>
+        <p>Everyone who has created a teacher account. Printed books stay off until you turn them on here.</p>
+        <div class="table-wrap"><table id="teachers"></table></div>
+      </div>
+
+      <div class="panel">
+        <h2>Print orders</h2>
+        <p>Every order sent since accounts were added. The PDF itself only goes out by email.</p>
+        <div class="table-wrap"><table id="orders"></table></div>
+      </div>
+
+      <div class="panel">
+        <h2>Class survey answers</h2>
+        <p>From the one-time notice a school's network sees after 1,000 requests to Pip.</p>
+        <div class="table-wrap"><table id="surveys"></table></div>
+      </div>
+
+      <div class="panel">
+        <h2>Teams</h2>
+        <p>One team is one class computer. Team names and students' stories are not visible here: the stories
+          are encrypted on the class computer and only the teacher's own computer can open them.</p>
+        <div class="table-wrap"><table id="teams"></table></div>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const WORKER = 'https://storysprout-pip.jackwangxyw.workers.dev';
+    const GOOGLE_CLIENT_ID = '642314399737-2mitejmjcc1jdtfn7mspjuhge9mu8ub5.apps.googleusercontent.com';
+    const $ = (id) => document.getElementById(id);
+
+    let cred = '';        // Google ID token, or 'pass:' + passphrase
+    let DATA = null;
+
+    function showErr(msg) { $('err').textContent = msg; $('err').classList.add('show'); }
+    function hideErr() { $('err').classList.remove('show'); }
+
+    async function api(path, body = {}) {
+      const res = await fetch(WORKER + path, {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + cred, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const out = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        // An hour after a Google sign-in the token expires; sign in again.
+        if (res.status === 401 || res.status === 403) signedOut();
+        throw new Error(out.error || 'HTTP ' + res.status);
+      }
+      return out;
+    }
+
+    const date = (ms) => ms ? new Date(ms).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '';
+    const dateTime = (ms) => ms ? new Date(ms).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '';
+    const ago = (ms) => {
+      if (!ms) return 'never';
+      const m = Math.round((Date.now() - ms) / 60000);
+      if (m < 60) return m + ' min ago';
+      if (m < 48 * 60) return Math.round(m / 60) + ' h ago';
+      return Math.round(m / 1440) + ' days ago';
+    };
+    const kb = (b) => b >= 1048576 ? (b / 1048576).toFixed(1) + ' MB' : Math.round(b / 1024) + ' KB';
+
+    // Cells are built with textContent, never innerHTML: every value here was
+    // typed by a teacher, a student or a stranger signing up.
+    function table(el, headers, rows, emptyText) {
+      el.textContent = '';
+      if (!rows.length) {
+        const tr = el.insertRow();
+        const td = tr.insertCell();
+        td.className = 'empty';
+        td.textContent = emptyText;
+        return;
+      }
+      const head = el.createTHead().insertRow();
+      for (const h of headers) {
+        const th = document.createElement('th');
+        th.textContent = h;
+        head.appendChild(th);
+      }
+      const body = el.createTBody();
+      for (const row of rows) {
+        const tr = body.insertRow();
+        for (const cell of row) {
+          const td = tr.insertCell();
+          if (cell instanceof Node) td.appendChild(cell);
+          else if (cell && typeof cell === 'object') {
+            td.textContent = cell.text ?? '';
+            if (cell.cls) td.className = cell.cls;
+          } else td.textContent = cell ?? '';
+        }
+      }
+    }
+
+    function el(tag, cls, text) {
+      const e = document.createElement(tag);
+      if (cls) e.className = cls;
+      if (text != null) e.textContent = text;
+      return e;
+    }
+
+    function render() {
+      const { teachers, teams, orders, surveys } = DATA;
+      const teamsOf = (id) => teams.filter(t => t.owner === id);
+      const ordersOf = (id) => orders.filter(o => o.teacherId === id);
+
+      const stat = (n, label) => { const d = el('div', 'stat'); d.append(el('b', null, n), el('span', null, label)); return d; };
+      $('stats').replaceChildren(
+        stat(teachers.length, 'teachers'),
+        stat(teachers.filter(t => !t.printApproved).length, 'waiting for printing'),
+        stat(teams.length, 'teams'),
+        stat(orders.reduce((n, o) => n + (o.copies || 0), 0), 'books ordered'),
+        stat(surveys.length, 'survey answers'),
+      );
+
+      const tRows = [...teachers].sort((a, b) => (a.printApproved - b.printApproved) || (b.createdAt - a.createdAt)).map(t => {
+        const mine = teamsOf(t.id);
+        const last = Math.max(0, ...mine.map(x => x.updatedAt));
+        const status = el('span', 'pill ' + (t.printApproved ? 'on' : 'off'), t.printApproved ? 'Printing on' : 'Printing off');
+        const btn = el('button', 'small' + (t.printApproved ? ' ghost' : ''), t.printApproved ? 'Turn off' : 'Approve');
+        btn.onclick = () => setApproved(t, !t.printApproved, btn);
+        const act = el('div');
+        act.style.cssText = 'display:flex;gap:8px;align-items:center';
+        act.append(status, btn);
+        return [
+          t.name, t.email, t.school, { text: t.zip, cls: 'nowrap' }, t.grades || '',
+          { text: date(t.createdAt), cls: 'nowrap' },
+          { text: mine.length, cls: 'num' },
+          { text: mine.length ? ago(last) : '', cls: 'nowrap' },
+          { text: ordersOf(t.id).reduce((n, o) => n + (o.copies || 0), 0), cls: 'num' },
+          act,
+        ];
+      });
+      table($('teachers'), ['Name', 'Email', 'School', 'ZIP', 'Grades', 'Signed up', 'Teams', 'Last student work', 'Books', 'Printing'],
+        tRows, 'No teacher accounts yet.');
+
+      const oRows = [...orders].sort((a, b) => b.at - a.at).map(o => {
+        const s = o.shipTo || {};
+        return [
+          { text: dateTime(o.at), cls: 'nowrap' }, { text: o.id, cls: 'nowrap' },
+          `${o.teacherName || ''} <${o.email || ''}>`, s.school, o.title,
+          { text: o.pages, cls: 'num' }, { text: o.copies, cls: 'num' },
+          o.grades, { text: o.classSize, cls: 'num' },
+          [s.name, s.line1, s.line2, `${s.city}, ${s.state} ${s.zip}`, s.phone].filter(Boolean).join(', '),
+        ];
+      });
+      table($('orders'), ['Sent', 'Order', 'Teacher', 'School', 'Book', 'Pages', 'Copies', 'Grades', 'Class', 'Ship to'],
+        oRows, 'No orders yet.');
+
+      const sRows = [...surveys].sort((a, b) => String(b.at).localeCompare(String(a.at))).map(s => [
+        { text: dateTime(Date.parse(s.at)), cls: 'nowrap' }, s.from === 'teacher' ? 'Teacher' : 'Student computer',
+        s.school, { text: s.classSize, cls: 'num' }, s.grade || '', s.afterSchool ? 'Yes' : 'No',
+      ]);
+      table($('surveys'), ['Answered', 'From', 'School', 'Class size', 'Grade', 'After-school'], sRows, 'No survey answers yet.');
+
+      const nameOf = (id) => { const t = teachers.find(x => x.id === id); return t ? `${t.name} (${t.school})` : null; };
+      const teamRows = [...teams].sort((a, b) => b.updatedAt - a.updatedAt).map(t => [
+        nameOf(t.owner) || { text: t.owner ? 'Teacher with no account yet' : 'Made with the passphrase, or before accounts', cls: 'muted' },
+        t.contentTier, { text: date(t.createdAt), cls: 'nowrap' }, { text: ago(t.updatedAt), cls: 'nowrap' },
+        { text: t.rev, cls: 'num' }, { text: t.blobCount, cls: 'num' }, { text: kb(t.bytes), cls: 'num' },
+      ]);
+      table($('teams'), ['Teacher', 'Content level', 'Created', 'Last synced', 'Syncs', 'Pictures', 'Size'], teamRows, 'No teams yet.');
+    }
+
+    async function setApproved(t, approved, btn) {
+      hideErr();
+      btn.disabled = true;
+      try {
+        const { account } = await api('/admin/approve', { id: t.id, approved });
+        Object.assign(t, account);
+        render();
+      } catch (e) {
+        showErr('Could not change printing for ' + t.email + ': ' + e.message);
+        btn.disabled = false;
+      }
+    }
+
+    async function load() {
+      hideErr();
+      $('refresh').disabled = true;
+      try {
+        DATA = await api('/admin/data');
+        $('signin-panel').classList.add('hide');
+        $('data').classList.remove('hide');
+        $('refresh').classList.remove('hide');
+        render();
+      } catch (e) {
+        showErr(e.message);
+      } finally {
+        $('refresh').disabled = false;
+      }
+    }
+
+    function signedOut() {
+      cred = '';
+      $('who').textContent = '';
+      $('signin-panel').classList.remove('hide');
+      renderSignIn();
+    }
+
+    function renderSignIn() {
+      const box = $('signin');
+      box.textContent = '';
+      const slot = el('div');
+      box.appendChild(slot);
+      const tryInit = () => {
+        if (!window.google?.accounts?.id) return setTimeout(tryInit, 100);
+        google.accounts.id.initialize({
+          client_id: GOOGLE_CLIENT_ID,
+          callback: (resp) => {
+            cred = resp.credential;
+            const claims = JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+            $('who').textContent = claims.email;
+            load();
+          },
+        });
+        google.accounts.id.renderButton(slot, { theme: 'outline', size: 'large', shape: 'pill', text: 'signin_with' });
+      };
+      tryInit();
+      const link = el('button', 'pass-link', 'use the passphrase');
+      link.onclick = () => {
+        const pass = prompt('Teacher passphrase:');
+        if (pass && pass.trim()) { cred = 'pass:' + pass.trim(); $('who').textContent = 'Signed in with passphrase'; load(); }
+      };
+      box.appendChild(link);
+    }
+
+    $('refresh').onclick = load;
+    renderSignIn();
+  </script>
+</body>
+
+</html>
