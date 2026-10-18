@@ -1260,6 +1260,7 @@
 
     const T = {
       idToken: null,     // Google ID token (primary)
+      idTokenExp: 0,     // when it stops working, ms
       pass: null,        // teacher passphrase (fallback)
       email: null,
       root: null,        // FileSystemDirectoryHandle for the class folder
@@ -1338,7 +1339,9 @@
 
     // Google first, passphrase second. The Worker tells them apart by the "pass:"
     // prefix — anything else it treats as a Google ID token and verifies properly.
-    function teacherAuthHeader() {
+    async function teacherAuthHeader() {
+      // The timer below can sleep with the laptop, so check again right before use.
+      if (T.idToken && T.idTokenExp - Date.now() < 2 * 60 * 1000) await renewGoogle();
       const cred = T.idToken ? T.idToken : (T.pass ? 'pass:' + T.pass : '');
       return { 'Authorization': 'Bearer ' + cred };
     }
@@ -1858,7 +1861,7 @@
           const keys = await SproutSync.deriveKeys(team.teamName, team.secretCode);
           const res = await fetch(WORKER + '/sync/policy', {
             method: 'POST',
-            headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+            headers: { ...(await teacherAuthHeader()), 'Content-Type': 'application/json' },
             body: JSON.stringify({ authToken: keys.authToken, tier }),
           });
           if (!res.ok) throw new Error((await res.json()).error || 'relay refused');
@@ -1908,7 +1911,7 @@
         const keys = await SproutSync.deriveKeys(teamName, secretCode);
         const res = await fetch(WORKER + '/sync/register', {
           method: 'POST',
-          headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+          headers: { ...(await teacherAuthHeader()), 'Content-Type': 'application/json' },
           // A new team starts at the class's current level, not at the default —
           // otherwise adding a machine mid-term would silently put that one child
           // on different rules from everyone else.
@@ -1983,7 +1986,7 @@
         const keys = await SproutSync.deriveKeys(team.teamName, team.secretCode);
         const res = await fetch(WORKER + '/sync/delete', {
           method: 'POST',
-          headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+          headers: { ...(await teacherAuthHeader()), 'Content-Type': 'application/json' },
           body: JSON.stringify({ authToken: keys.authToken }),
         });
         if (!res.ok) throw new Error((await res.json()).error || 'could not erase the team from the relay');
@@ -2140,7 +2143,7 @@
     async function printCall(path, body) {
       const res = await fetch(WORKER + path, {
         method: 'POST',
-        headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+        headers: { ...(await teacherAuthHeader()), 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
       });
       return { res, out: await res.json() };
@@ -2304,7 +2307,7 @@
       try {
         const res = await fetch(WORKER + '/notice/teams', {
           method: 'POST',
-          headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+          headers: { ...(await teacherAuthHeader()), 'Content-Type': 'application/json' },
           body: JSON.stringify({ authTokens: await teamTokens() }),
         });
         const { notice } = await res.json();
@@ -2339,7 +2342,7 @@
       try {
         const res = await fetch(WORKER + '/notice/teams/ack', {
           method: 'POST',
-          headers: { ...teacherAuthHeader(), 'Content-Type': 'application/json' },
+          headers: { ...(await teacherAuthHeader()), 'Content-Type': 'application/json' },
           body: JSON.stringify({ authTokens: await teamTokens(), survey }),
         });
         if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'HTTP ' + res.status);
@@ -2385,10 +2388,34 @@
 
     /* ── boot ────────────────────────────────────────────────────────────────── */
 
+    // Google's ID token lasts an hour and nothing here renewed it, so a teacher who
+    // left the page open through a lesson got "Sign-in expired" at the moment they
+    // ordered a book. prompt() with auto_select hands back a new token without a
+    // click for the account that already signed in here; when Google won't do it
+    // silently, One Tap shows its own "Continue as" card. If no token comes back the
+    // old one stays, and the Worker's "Sign-in expired" is what the teacher sees.
+    let renewing = null, renewDone = null, renewTimer = null;
+    function renewGoogle() {
+      if (!T.idToken || !window.google?.accounts?.id) return Promise.resolve();
+      if (renewing) return renewing;
+      renewing = new Promise(resolve => {
+        const giveUp = setTimeout(() => renewDone(), 30000);
+        renewDone = () => { clearTimeout(giveUp); renewing = renewDone = null; resolve(); };
+        google.accounts.id.prompt(n => {
+          if (n.isSkippedMoment() || (n.isDismissedMoment() && n.getDismissedReason() !== 'credential_returned')) renewDone?.();
+        });
+      });
+      return renewing;
+    }
+
     window.onGoogleSignIn = (resp) => {
       T.idToken = resp.credential;
       T.pass = null;
       const claims = JSON.parse(atob(resp.credential.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      T.idTokenExp = claims.exp * 1000;
+      clearTimeout(renewTimer);
+      renewTimer = setTimeout(renewGoogle, Math.max(0, T.idTokenExp - Date.now() - 5 * 60 * 1000));
+      renewDone?.();
       onSignedIn(claims.email);
     };
 
@@ -2417,7 +2444,7 @@
 
         const tryInit = () => {
           if (!window.google?.accounts?.id) return setTimeout(tryInit, 100);
-          google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: window.onGoogleSignIn });
+          google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: window.onGoogleSignIn, auto_select: true });
           google.accounts.id.renderButton(slot, {
             theme: 'outline', size: 'large', shape: 'pill',
             text: 'signin_with', logo_alignment: 'center',
