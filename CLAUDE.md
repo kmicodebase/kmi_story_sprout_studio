@@ -15,6 +15,7 @@ It also has a **Teacher Mode**: a teacher collects every child's work onto their
 | `workshop-plugin.html` | **The app.** ~3,900 lines, single file. This is what you almost always want. |
 | `teacher.html` | Teacher Mode dashboard — create teams, collect student work. |
 | `admin.html` | StorySprout's admin page — every teacher account, team record, order and survey answer; switches printing on per teacher. |
+| `privacy.html` | Privacy policy, linked from the Google OAuth consent screen. Update it when what the Worker stores changes. |
 | `sprout-sync.js` | Shared crypto + content-addressing + relay client. Loaded by **both** pages. |
 | `sprout-sync-test.html` | Test harness for the above. Open it, click *Run tests*. |
 | `sprout-book.js` | Draws a story's pages and builds the PDF. Loaded by **both** pages: the Studio's book preview/PDF/print and the teacher's book viewer and print orders. Needs Fabric. |
