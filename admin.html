@@ -99,6 +99,9 @@
     .pill { display: inline-block; font-size: 11px; font-weight: 800; padding: 2px 8px; border-radius: 20px; white-space: nowrap; }
     .pill.on { background: #e3f6ee; color: var(--green); }
     .pill.off { background: #fbf0dd; color: var(--amber); }
+    .pill.banned { background: #fdeaea; color: var(--red); }
+    button.danger { background: var(--white); color: var(--red); border: 2px solid #f3c9c9; }
+    button.danger:hover:not(:disabled) { background: #fdeaea; }
     .empty { color: var(--ink3); padding: 8px 0; }
 
     .err {
@@ -137,7 +140,9 @@
 
       <div class="panel">
         <h2>Teachers</h2>
-        <p>Everyone who has created a teacher account. Printed books stay off until you turn them on here.</p>
+        <p>Everyone who has created a teacher account. Printed books stay off until you turn them on here.
+          Ban keeps the account but stops it making teams, printing or signing up again; its classes keep syncing.
+          Delete erases the account and every team it owns, and the same Google account can sign up again.</p>
         <div class="table-wrap"><table id="teachers"></table></div>
       </div>
 
@@ -245,7 +250,7 @@
       const stat = (n, label) => { const d = el('div', 'stat'); d.append(el('b', null, n), el('span', null, label)); return d; };
       $('stats').replaceChildren(
         stat(teachers.length, 'teachers'),
-        stat(teachers.filter(t => !t.printApproved).length, 'waiting for printing'),
+        stat(teachers.filter(t => !t.printApproved && !t.banned).length, 'waiting for printing'),
         stat(teams.length, 'teams'),
         stat(orders.reduce((n, o) => n + (o.copies || 0), 0), 'books ordered'),
         stat(surveys.length, 'survey answers'),
@@ -260,16 +265,24 @@
         const act = el('div');
         act.style.cssText = 'display:flex;gap:8px;align-items:center';
         act.append(status, btn);
+        const acct = el('div');
+        acct.style.cssText = 'display:flex;gap:8px;align-items:center';
+        if (t.banned) acct.append(el('span', 'pill banned', 'Banned'));
+        const ban = el('button', 'small ghost', t.banned ? 'Unban' : 'Ban');
+        ban.onclick = () => setBanned(t, !t.banned, ban);
+        const del = el('button', 'small danger', 'Delete');
+        del.onclick = () => deleteTeacher(t, mine.length, del);
+        acct.append(ban, del);
         return [
           t.name, t.email, t.school, { text: t.zip, cls: 'nowrap' }, t.grades || '',
           { text: date(t.createdAt), cls: 'nowrap' },
           { text: mine.length, cls: 'num' },
           { text: mine.length ? ago(last) : '', cls: 'nowrap' },
           { text: ordersOf(t.id).reduce((n, o) => n + (o.copies || 0), 0), cls: 'num' },
-          act,
+          act, acct,
         ];
       });
-      table($('teachers'), ['Name', 'Email', 'School', 'ZIP', 'Grades', 'Signed up', 'Teams', 'Last student work', 'Books', 'Printing'],
+      table($('teachers'), ['Name', 'Email', 'School', 'ZIP', 'Grades', 'Signed up', 'Teams', 'Last student work', 'Books', 'Printing', 'Account'],
         tRows, 'No teacher accounts yet.');
 
       const oRows = [...orders].sort((a, b) => b.at - a.at).map(o => {
@@ -309,6 +322,34 @@
         render();
       } catch (e) {
         showErr('Could not change printing for ' + t.email + ': ' + e.message);
+        btn.disabled = false;
+      }
+    }
+
+    async function setBanned(t, banned, btn) {
+      hideErr();
+      btn.disabled = true;
+      try {
+        const { account } = await api('/admin/ban', { id: t.id, banned });
+        Object.assign(t, account);
+        render();
+      } catch (e) {
+        showErr('Could not change the ban for ' + t.email + ': ' + e.message);
+        btn.disabled = false;
+      }
+    }
+
+    async function deleteTeacher(t, teamCount, btn) {
+      const teams = teamCount === 1 ? '1 team' : teamCount + ' teams';
+      if (!confirm(`Delete ${t.name} <${t.email}> and their ${teams}?\n\nThe students' saved work on the relay is erased and cannot be brought back. `
+        + `Copies already in the teacher's own class folder are not touched. They can sign up again with the same Google account (use Ban to stop that).`)) return;
+      hideErr();
+      btn.disabled = true;
+      try {
+        await api('/admin/delete', { id: t.id });
+        await load();
+      } catch (e) {
+        showErr('Could not delete ' + t.email + ': ' + e.message);
         btn.disabled = false;
       }
     }

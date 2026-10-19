@@ -2471,6 +2471,7 @@
         const out = await res.json();
         if (!res.ok) throw new Error(out.error || 'HTTP ' + res.status);
         T.account = out.account;
+        if (T.account?.banned) return showErr('setup-err', 'This teacher account has been turned off by StorySprout. Your classes still sync, but you cannot make new teams or order books.');
         if (T.account) return;
         $('signup-email').textContent = claims.email;
         $('signup-name').value ||= claims.name || '';

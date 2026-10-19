@@ -38,6 +38,8 @@
 //   POST /account/signup    — teacher: { name, school, zip, grades } -> { account }
 //   POST /admin/data        — admin: every account, team record, order and survey
 //   POST /admin/approve     — admin: { id, approved } turns printing on or off for an account
+//   POST /admin/ban         — admin: { id, banned } turns an account off or back on
+//   POST /admin/delete      — admin: { id } erases an account and every team it owns
 //
 //   Usage notice (see the USAGE NOTICE block):
 //   GET  /notice            — the notice text
@@ -1736,12 +1738,21 @@ async function handlePrint(path, request, env) {
    survey. It never sees a story: those are encrypted with a key that never
    reaches this Worker.
 
+   An admin can also ban an account or delete it. A ban keeps the record (so the
+   same Google account cannot just sign up again) and stops it making teams,
+   printing or editing its profile. Its existing teams keep syncing: they are
+   children's work, reached with the team token, not the teacher's sign-in.
+   Delete erases the account AND every team it owns from R2; the teacher's own
+   folder copy is out of reach. A deleted teacher may sign up again; a banned
+   one may not.
+
    Storage: teachers/<who.id>.json
      { id, email, name, school, zip, grades, createdAt, updatedAt,
-       printApproved, printApprovedAt? }
+       printApproved, printApprovedAt?, banned?, bannedAt? }
    ═══════════════════════════════════════════════════════════════════════════ */
 const ADMIN_PAGE_URL = 'https://kmicodebase.github.io/kmi_story_sprout_studio/admin.html';
 const accountKey = (id) => `teachers/${id}.json`;
+const BANNED_MSG = 'This teacher account has been turned off by StorySprout.';
 
 // The account behind a Google sign-in, or a 403 that tells the teacher what to
 // do. The passphrase holder has no account and needs none.
@@ -1749,6 +1760,7 @@ async function requireAccount(store, who) {
   if (who.admin) return null;
   const acct = await store.getJson(accountKey(who.id));
   if (!acct) throw httpError(403, 'Finish signing up first: reload the teacher page and fill in the sign-up form.');
+  if (acct.banned) throw httpError(403, BANNED_MSG);
   return acct;
 }
 
@@ -1822,6 +1834,7 @@ async function handleAccount(path, request, env, ctx) {
       const profile = readSignup(await request.json().catch(() => ({})));
       let created = false;
       const acct = await updateRecord(store, accountKey(who.id), (cur) => {
+        if (cur?.banned) throw httpError(403, BANNED_MSG);
         created = !cur;
         return {
           printApproved: false, createdAt: Date.now(), ...cur,
@@ -1861,6 +1874,36 @@ async function handleAccount(path, request, env, ctx) {
         return { ...cur, printApproved: approved === true, printApprovedAt: approved === true ? Date.now() : null };
       });
       return jsonResponse({ account: acct });
+    }
+
+    if (path === '/admin/ban') {
+      await verifyAdmin(request, env);
+      const { id, banned } = await request.json().catch(() => ({}));
+      if (!/^[0-9a-f]{64}$/.test(id || '')) throw httpError(400, 'Bad teacher id.');
+      const acct = await updateRecord(store, accountKey(id), (cur) => {
+        if (!cur) throw httpError(404, 'No such teacher.');
+        return { ...cur, banned: banned === true, bannedAt: banned === true ? Date.now() : null };
+      });
+      return jsonResponse({ account: acct });
+    }
+
+    // The account and every team it owns. Teams go first: if this is cut off
+    // part-way, the account is still listed and Delete can be pressed again.
+    if (path === '/admin/delete') {
+      await verifyAdmin(request, env);
+      const { id } = await request.json().catch(() => ({}));
+      if (!/^[0-9a-f]{64}$/.test(id || '')) throw httpError(400, 'Bad teacher id.');
+      if (!(await store.head(accountKey(id)))) throw httpError(404, 'No such teacher.');
+      let teams = 0, objects = 0;
+      for (const prefix of await store.listPrefixes('t/')) {
+        const m = await store.getJson(prefix + 'meta.json');
+        if (m?.owner !== id) continue;
+        const keys = await store.list(prefix);
+        for (const k of keys) await store.delete(k);
+        teams++; objects += keys.length;
+      }
+      await store.delete(accountKey(id));
+      return jsonResponse({ deleted: true, teams, objects });
     }
 
     throw httpError(404, 'Not found: ' + request.method + ' ' + path);

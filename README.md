@@ -258,7 +258,7 @@ The Worker exposes:
 | `POST /sync/pages/check` · `GET · PUT /sync/page/<id>` | Encrypted pages, the same way. A page no push has used for a day is deleted. |
 | `POST /print/quota` · `/print/raise` · `/print/order` | Teacher only (Google). Printed-book allowance, the one-time raise to 6, and the order email. Raising and ordering need an account the admin approved. |
 | `POST /account` · `/account/signup` | Teacher (Google): the teacher account, or `null` so the page shows the sign-up form. Stored in R2 under `teachers/` |
-| `POST /admin/data` · `/admin/approve` | Admin only: everything `admin.html` shows, and switching printing on or off for an account |
+| `POST /admin/data` · `/admin/approve` · `/admin/ban` · `/admin/delete` | Admin only: everything `admin.html` shows, switching printing on or off for an account, banning an account (it stays, can't make teams, print or sign up again), and deleting one along with every team it owns |
 | `GET /notice` · `POST /notice/ack` · `/notice/teams` · `/notice/teams/ack` | The one-time "Help us improve Story Sprout" form when a network passes 1,000 requests. Answers land in R2 under `survey/` |
 | `GET · PUT /sync/assign` | The teacher's assignment — its own object, so it can't race a student's push |
 
